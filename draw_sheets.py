@@ -83,7 +83,8 @@ def format_name(name):
     return f"__ {first:s} {last:s}"
 
 
-def draw(names, groups, title="Groups", smallfont=18, bigfont=25):
+def draw(names, groups, title="Groups", smallfont=18, bigfont=25,
+         margin=0.015, title_margin=0.075):
     """Draw the group assignment on tables
 
     Args:
@@ -122,9 +123,11 @@ def draw(names, groups, title="Groups", smallfont=18, bigfont=25):
                     transform=ax.transAxes,
                     fontsize=smallfont, ha="center", va="center")
 
-    # TODO figure out why this sometimes leaves a margin on the right
-    #      set margins by hand instead
-    fig.tight_layout()
+    # adjust spacing between subplots
+    fig.subplots_adjust(left=margin, right=1 - margin,
+                        top=1 - title_margin, bottom=margin,
+                        wspace=margin * len(table_layout[0]),
+                        hspace=margin * len(table_layout))
 
     return fig
 
