@@ -93,6 +93,8 @@ Copy the token into
 TOKEN = "<your_access_token_here>"
 ```
 
+WARNING: Don't commit the TOKEN to git!
+
 Now you can automatically download the next labs groups from Canvas using
 
 ```
@@ -197,7 +199,8 @@ won't repeat failed tasks.
 
 ### Windows
 
-I don't know how Windows works, usually it doesn't.
+You can use the `Task Scheduler` program to create a new task that runs the
+executable once a week at a specific time.
 
 ### MacOS
 
