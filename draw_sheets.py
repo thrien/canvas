@@ -13,8 +13,9 @@ Files are organized in the current directory like this:
 # standard library
 import os.path
 import argparse
-import json
+from argparse import ArgumentTypeError
 from urllib.request import Request, urlopen
+import json
 # external dependencies
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,6 +30,10 @@ class RawDescriptionDefaultsHelpFormatter(
 API_URL = "https://umich.instructure.com/api/v1"
 TOKEN = ""
 COURSE_ID = 850281
+
+# Help message for number list format
+NUMBER_LIST_FORMAT = 'comma-separated list of numbers and intervals a..b, ' \
+                     'e.g., "1..4,6,-1", where -1 means next lab'
 
 # int for group numbers, 'I' for the instructor (optional), '.' for nothing
 instructor = ""  # last name, first name
@@ -135,24 +140,28 @@ os.chdir(os.path.dirname(__file__))
 # already existing labs on disk
 prefix = "lab"
 existing_labs = [int(entry.removeprefix(prefix)) for entry in os.listdir()
-        if os.path.isdir(entry) and entry.startswith(prefix)]
+                 if os.path.isdir(entry) and entry.startswith(prefix)]
 existing_labs.sort()
 
 
 def number_list(string, last=max(existing_labs, default=0)):
-    """Parse a comma-separated list of numbers and intervals, e.g. "10..15,25"
+    f"""Parse a {NUMBER_LIST_FORMAT}
     """
     is_interval = lambda expr: ".." in expr
     wrap = lambda n: last - n if n < 0 else n
     
     numbers = set()
-    for part in string.split(","):
-        if is_interval(part):
-            start, end = map(int, part.split(".."))
-            numbers.update(range(start, end + 1))
-        else:
-            numbers.add(int(part))
-    return sorted(wrap(n) for n in numbers)
+    try:
+        for part in string.split(","):
+            if is_interval(part):
+                start, end = map(int, part.split(".."))
+                numbers.update(range(start, end + 1))
+            else:
+                numbers.add(int(part))
+        return sorted(wrap(n) for n in numbers)
+    except ValueError:
+        raise ArgumentTypeError(f"invalid number list: '{string}'. "
+                                f"Must be a {NUMBER_LIST_FORMAT}.")
 
 # parse user arguments
 description, epilog = __doc__.split("\n\n")
@@ -165,9 +174,10 @@ parser.add_argument("-f", "--force", action="store_true",
 parser.add_argument("-e", "--extensions", nargs="+", default=["pdf", "png"],
                     metavar="ext", help="output formats")
 parser.add_argument("-l", "--labs", type=number_list,
-                    default=[max(existing_labs, default=0) + bool(TOKEN)] if existing_labs or TOKEN else [],
+                    default=[max(existing_labs, default=0) + bool(TOKEN)] if
+                            existing_labs or TOKEN else [],
                     metavar="numbers",
-                    help='e.g., "1-4,6", -1 means next lab')
+                    help=NUMBER_LIST_FORMAT)
 parser.add_argument("-s", "--sections", type=int, nargs="+", default=[15, 25],
                     metavar="section", help="your section numbers")
 args = parser.parse_args()
@@ -204,7 +214,8 @@ for lab in args.labs:
         fig = draw(names[mask], groups[mask],
                 title=f"Groups for Lab {lab:02d} Section {section:03d}")
         for ext in args.extensions:
-            filename = os.path.join(f"lab{lab:02d}", f"groups{section:03d}.{ext}")
+            filename = os.path.join(f"lab{lab:02d}",
+                                    f"groups{section:03d}.{ext}")
             fig.savefig(filename)
             if args.verbose:
                 print(f'Output written to "{filename}"')
