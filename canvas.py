@@ -46,19 +46,37 @@ tables = [table for row in table_layout
                 if isinstance(table, int)]
 
 
-def _canvas_api(command):
+def _canvas_api(command, parameters={}, verbose=False):
     if not TOKEN:
         raise RuntimeError("No Canvas API access token defined.")
-    request = Request(f"{API_URL}/{command}",
-                      headers={"Authorization": f"Bearer {TOKEN}"})
-    return urlopen(request)
+    headers = {"Authorization": f"Bearer {TOKEN}",
+                               "per_page": "20"}
+    headers.update(parameters)
+    request = Request(f"{API_URL}/{command}", headers=headers)
+    response = urlopen(request)
+    if "Link" in response.headers:
+        print(response.headers["Link"])
+        links = {link.split("; rel=")[1].strip('"'): link.split(";")[0].strip("<>")
+                 for link in response.headers["Link"].split(",")}
+        if verbose:
+            print(f"Found links: {', '.join(links.values())}.")
+        next_request = Request(links["next"],
+                               headers={"Authorization": f"Bearer {TOKEN}"})
+        next_page = urlopen(next_request)
+        return next_page
+    return response
 
 
 def _canvas_import_csv(lab, verbose=False):
     # the groups for each lab are defined in a group category on Canvas
-    with _canvas_api(f"courses/{COURSE_ID}/group_categories") as response:
+    with _canvas_api(f"courses/{COURSE_ID}/group_categories", verbose=verbose) as response:
         categories = json.load(response)
+        if verbose:
+            print(json.dumps(categories, indent=4))
     try:
+        if verbose:
+            print(f"Looking for group category for lab {lab:d} among "
+                  f"{len(categories)} categories.")
         category = next(category for category in categories
                         if category["name"].lower() == f"lab {lab:d}")
     except StopIteration:
@@ -261,10 +279,11 @@ def introduction(lab, section):
 introduction.parser = introduction_parser
 
 
-def _get_quiz_code(lab):
+def _get_quiz_code(lab, verbose=False):
     # the quiz code for each lab is defined in a quiz on Canvas
     with _canvas_api(f"courses/{COURSE_ID}/quizzes",
-                    parameters={"search_term": f"Quiz {lab:d}:"}) as response:
+                    parameters={"search_term": f"Quiz {lab:d}:"},
+                    verbose=verbose) as response:
         quizzes = json.load(response)
     try:
         quiz = next(quiz for quiz in quizzes
@@ -275,12 +294,14 @@ def _get_quiz_code(lab):
 
 
 def quiz_code_parser(parser):
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="print status messages")
     parser.add_argument("-l", "--lab", type=int,
                         default=max(existing_labs, default=0),
                         metavar="number")
 
 
-def quiz_code(lab):
+def quiz_code(lab, verbose=False):
     """Update the quiz code on the introduction slides
     
     This commands pulls the latest quiz code from the Canvas API and updates
@@ -295,7 +316,7 @@ def quiz_code(lab):
 
     # Update quiz slide
     quiz_slide = prs.slides[2]
-    quiz_code = _get_quiz_code(lab)
+    quiz_code = _get_quiz_code(lab, verbose=verbose)
     quiz_slide.placeholders[0].text = quiz_code
 
     # Save the modified presentation
