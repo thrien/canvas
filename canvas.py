@@ -6,7 +6,6 @@ It is intented to be used by GSI for PHYSICS 151/251 at the University of
 Michigan.
 """
 # standard library
-from glob import glob
 import os.path
 import argparse
 from argparse import ArgumentTypeError
@@ -46,7 +45,7 @@ tables = [table for row in table_layout
                 if isinstance(table, int)]
 
 
-def _canvas_api(command, raw=False, headers={}, verbose=False):
+def _canvas_api(command, full_url=False, headers={}, verbose=False):
     """Call the Canvas API with the given command and parameters
     
     Args:
@@ -54,12 +53,12 @@ def _canvas_api(command, raw=False, headers={}, verbose=False):
         parameters: additional parameters to be sent as headers, e.g.,
                     {"search_term": "lab 1"}
     Returns:
-        the response as a Python object
+        the response as a Python object (list for JSON, else string)
     """
     if not TOKEN:
         raise RuntimeError("No Canvas API access token defined.")
     
-    request = Request(command if raw else f"{API_URL}/{command}",
+    request = Request(command if full_url else f"{API_URL}/{command}",
                       headers=headers|{"Authorization": f"Bearer {TOKEN}"})
     response = urlopen(request)
     if response.getheader("Content-Type").startswith("application/json"):
@@ -71,7 +70,7 @@ def _canvas_api(command, raw=False, headers={}, verbose=False):
         links = response.getheader("Link").split(",")
         pages = {rel.removeprefix(" rel=").strip('"'): link.strip("<>")
                     for link, rel in map(lambda page: page.split(";"), links)}
-        content += _canvas_api(pages["next"], raw=True, verbose=verbose)
+        content += _canvas_api(pages["next"], full_url=True, verbose=verbose)
     except (KeyError, AttributeError):
         pass
 
@@ -311,6 +310,9 @@ def quiz_code(lab, verbose=False):
     This commands pulls the latest quiz code from the Canvas API and updates
     the corresponding slide in the introduction.
     """
+    if verbose:
+        print(f"Updating quiz code for lab {lab:d}.")
+
     intros_path = r"C:\\Users\\umthr\\OneDrive - Umich\\Documents\\Teaching" \
                   r"\\WN26 PHYSICS 251\\Introductions"
     intro = f"{intros_path}\\PHYS251 Lab {lab:02d}.pptx"
@@ -322,9 +324,13 @@ def quiz_code(lab, verbose=False):
     quiz_slide = prs.slides[2]
     quiz_code = _get_quiz_code(lab, verbose=verbose)
     quiz_slide.placeholders[0].text = quiz_code
+    if verbose:
+        print(f'Quiz code "{quiz_code}" retrieved from Canvas.')
 
     # Save the modified presentation
     prs.save(intro)
+    if verbose:
+        print(f'Updated presentation "{intro}".')
 
 quiz_code.parser = quiz_code_parser
 
@@ -364,16 +370,23 @@ if __name__ == "__main__":
                                                  "as a GSI")
     
     commands = [sheets, introduction, quiz_code]
+    aliases = {"introduction": ["intro"],
+               "quiz_code": ["quiz"]}
     subparsers = parser.add_subparsers(dest="command",
                                        title="commands",
                                        required=True)
     for command in commands:
         description, epilog = command.__doc__.split("\n\n", maxsplit=1)
-        command.parser(subparsers.add_parser(command.__name__,
-                                             formatter_class=
-                                             RawDescriptionDefaultsHelpFormatter,
-                                             description=description,
-                                             epilog=epilog))
+        subparser = subparsers.add_parser(command.__name__,
+                                          aliases=aliases.get(command.__name__,
+                                                              []),
+                                          formatter_class=
+                                          RawDescriptionDefaultsHelpFormatter,
+                                          description=description,
+                                          epilog=epilog)
+        # populate subparser with command-specific arguments 
+        # see e.g., sheets.parser = sheets_parser
+        command.parser(subparser)
     
     args = vars(parser.parse_args())
 
