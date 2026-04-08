@@ -46,46 +46,51 @@ tables = [table for row in table_layout
                 if isinstance(table, int)]
 
 
-def _canvas_api(command, parameters={}, verbose=False):
+def _canvas_api(command, raw=False, headers={}, verbose=False):
+    """Call the Canvas API with the given command and parameters
+    
+    Args:
+        command: the API command, e.g., "courses/123/groups"
+        parameters: additional parameters to be sent as headers, e.g.,
+                    {"search_term": "lab 1"}
+    Returns:
+        the response as a Python object
+    """
     if not TOKEN:
         raise RuntimeError("No Canvas API access token defined.")
-    headers = {"Authorization": f"Bearer {TOKEN}",
-                               "per_page": "20"}
-    headers.update(parameters)
-    request = Request(f"{API_URL}/{command}", headers=headers)
+    
+    request = Request(command if raw else f"{API_URL}/{command}",
+                      headers=headers|{"Authorization": f"Bearer {TOKEN}"})
     response = urlopen(request)
-    if "Link" in response.headers:
-        print(response.headers["Link"])
-        links = {link.split("; rel=")[1].strip('"'): link.split(";")[0].strip("<>")
-                 for link in response.headers["Link"].split(",")}
-        if verbose:
-            print(f"Found links: {', '.join(links.values())}.")
-        next_request = Request(links["next"],
-                               headers={"Authorization": f"Bearer {TOKEN}"})
-        next_page = urlopen(next_request)
-        return next_page
-    return response
+    if response.getheader("Content-Type").startswith("application/json"):
+        content = json.load(response)
+    else:
+        content = response.read()
+
+    try:  # reading next pages
+        links = response.getheader("Link").split(",")
+        pages = {rel.removeprefix(" rel=").strip('"'): link.strip("<>")
+                    for link, rel in map(lambda page: page.split(";"), links)}
+        content += _canvas_api(pages["next"], raw=True, verbose=verbose)
+    except (KeyError, AttributeError):
+        pass
+
+    return content
 
 
 def _canvas_import_csv(lab, verbose=False):
     # the groups for each lab are defined in a group category on Canvas
-    with _canvas_api(f"courses/{COURSE_ID}/group_categories", verbose=verbose) as response:
-        categories = json.load(response)
-        if verbose:
-            print(json.dumps(categories, indent=4))
+    categories = _canvas_api(f"courses/{COURSE_ID}/group_categories",
+                             verbose=verbose)
     try:
-        if verbose:
-            print(f"Looking for group category for lab {lab:d} among "
-                  f"{len(categories)} categories.")
         category = next(category for category in categories
                         if category["name"].lower() == f"lab {lab:d}")
     except StopIteration:
         raise RuntimeError(f"Couldn't find groups for lab {lab:d} on Canvas.")
 
     # ask Canvas to export the groups for this lab as a CSV
-    with _canvas_api(f"group_categories/{category["id"]}/export") \
-            as response:
-        data = response.read()
+    data = _canvas_api(f"group_categories/{category["id"]}/export",
+                       verbose=verbose)
 
     # save CSV on disk
     filename = os.path.join(f"lab{lab:02d}", "canvas.csv")
@@ -281,10 +286,9 @@ introduction.parser = introduction_parser
 
 def _get_quiz_code(lab, verbose=False):
     # the quiz code for each lab is defined in a quiz on Canvas
-    with _canvas_api(f"courses/{COURSE_ID}/quizzes",
-                    parameters={"search_term": f"Quiz {lab:d}:"},
-                    verbose=verbose) as response:
-        quizzes = json.load(response)
+    quizzes = _canvas_api(f"courses/{COURSE_ID}/quizzes",
+                    headers={"search_term": f"Quiz {lab:d}:"},
+                    verbose=verbose)
     try:
         quiz = next(quiz for quiz in quizzes
                     if quiz["title"].startswith(f"Quiz {lab:d}:"))
