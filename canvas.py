@@ -274,7 +274,7 @@ def introduction(lab, sections, update=False, verbose=False):
 
     The template has three slides:
         - title page with lab and first section number
-        - sign-in sheets with assigned groups stacked on top of each other
+        - sign-in sheets stacked on top of each other
         - a placeholder for the quiz code
 
     Since the quiz code changes quite frequently we put a placeholder in the
@@ -406,6 +406,7 @@ if __name__ == "__main__":
                                           formatter_class=
                                           RawDescriptionDefaultsHelpFormatter,
                                           description=description,
+                                          help=description,
                                           epilog=epilog)
         # Populate subparser with command-specific arguments 
         # see e.g., sheets.parser = _sheets_parser
