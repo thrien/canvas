@@ -3,5 +3,5 @@ $lab = Get-ChildItem -Path $root -Directory -Filter "lab??" | Sort-Object Name |
 $sheets = Get-ChildItem -Path $lab.FullName -Filter *.pdf
 foreach ($sheet in $sheets) {
 	Start-Process -FilePath $sheet.FullName -Verb Print -PassThru
-	Start-Sleep -Seconds 2
+	Start-Sleep -Seconds 5
 }
