@@ -30,9 +30,14 @@ API_URL = "https://umich.instructure.com/api/v1"
 TOKEN = "1770~LmwFVBxH4Ja4Qw3TKLZc4LQ3cLQPauPtED36yJAyDX4MJkZPneJ7DXhC2mnmAWt8"
 COURSE_ID = 850281
 
-# Help message for number list format
-NUMBER_LIST_FORMAT = 'comma-separated list of numbers and intervals a..b, ' \
-                     'e.g., "1..4,6,-1", where -1 means next lab'
+# Make sure we are in the right directory
+os.chdir(os.path.dirname(__file__))
+
+# already existing labs on disk
+prefix = "lab"
+existing_labs = [int(entry.removeprefix(prefix)) for entry in os.listdir()
+                 if os.path.isdir(entry) and entry.startswith(prefix)]
+existing_labs.sort()
 
 instructor = "Thrien, Tobias"  # last name, first name
 # int for group numbers, 'I' for the instructor (optional), '.' for nothing
@@ -78,7 +83,7 @@ def _canvas_api(command, full_url=False, headers={}, verbose=False):
 
 
 def _canvas_import_csv(lab, verbose=False):
-    # the groups for each lab are defined in a group category on Canvas
+    # The groups for each lab are defined in a group category on Canvas
     categories = _canvas_api(f"courses/{COURSE_ID}/group_categories",
                              verbose=verbose)
     try:
@@ -87,11 +92,11 @@ def _canvas_import_csv(lab, verbose=False):
     except StopIteration:
         raise RuntimeError(f"Couldn't find groups for lab {lab:d} on Canvas.")
 
-    # ask Canvas to export the groups for this lab as a CSV
+    # Ask Canvas to export the groups for this lab as a CSV
     data = _canvas_api(f"group_categories/{category["id"]}/export",
                        verbose=verbose)
 
-    # save CSV on disk
+    # Save CSV on disk
     filename = os.path.join(f"lab{lab:02d}", "canvas.csv")
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "wb") as file:
@@ -120,13 +125,13 @@ def _draw(names, groups, title="Groups", smallfont=18, bigfont=25,
     Returns:
         the created matplotlib figure
     """
-    # create a grid of subplots based on table layout
+    # Create a grid of subplots based on table layout
     fig, axes = plt.subplot_mosaic(table_layout, figsize=(11, 8.5))
 
     fig.suptitle(title, fontsize=bigfont)
 
     for table in tables:
-        # remove ticks and thicken spine for group axes
+        # Remove ticks and thicken spine for group axes
         ax = axes[table]
         ax.set_xticks([])
         ax.set_yticks([])
@@ -141,7 +146,7 @@ def _draw(names, groups, title="Groups", smallfont=18, bigfont=25,
                 transform=ax.transAxes,
                 fontsize=smallfont, ha="left", va="top")
 
-    # subplot for the instructor (me)
+    # Subplot for the instructor (me)
     if 'I' in axes.keys():
         ax = axes['I']
         ax.set_axis_off()
@@ -150,13 +155,32 @@ def _draw(names, groups, title="Groups", smallfont=18, bigfont=25,
                     transform=ax.transAxes,
                     fontsize=smallfont, ha="center", va="center")
 
-    # adjust spacing between subplots
+    # Adjust spacing between subplots
     fig.subplots_adjust(left=margin, right=1 - margin,
                         top=1 - title_margin, bottom=margin,
                         wspace=margin * len(table_layout[0]),
                         hspace=margin * len(table_layout))
 
     return fig
+
+
+class FlatListAction(argparse.Action):
+    """Action for argparse that flattens a list of lists
+
+    With the interval type this parses "-l 1..3 5" into [1, 2, 3, 5].
+    """
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, sum(values, start=[]))
+
+
+def interval(string, last=max(existing_labs, default=0)):
+    """integers or intervals like a..b"""
+    wrap = lambda n: last - n if n < 0 else n
+    if ".." in string:
+        a, b = map(wrap, map(int, string.split("..")))
+        return list(range(a, b + 1))
+    else:
+        return [wrap(int(string))]
 
 
 def _sheets_parser(parser):
@@ -167,11 +191,11 @@ def _sheets_parser(parser):
     parser.add_argument("-e", "--extensions", nargs="+",
                         default=["pdf", "png"],
                         metavar="ext", help="output formats")
-    parser.add_argument("-l", "--labs", type=_number_list,
+    parser.add_argument("-l", "--labs", type=interval, nargs="+",
+                        action=FlatListAction,
                         default=[max(existing_labs, default=0) + bool(TOKEN)]
                                 if existing_labs or TOKEN else [],
-                        metavar="numbers",
-                        help=NUMBER_LIST_FORMAT)
+                        metavar="numbers", help=interval.__doc__)
     parser.add_argument("-s", "--sections", type=int, nargs="+",
                         default=[15, 25], metavar="section",
                         help="your section numbers")
@@ -194,7 +218,7 @@ def sheets(labs, sections,
               f"sections [{', '.join(str(section) for section in sections)}].")
 
     for lab in labs:
-        # download CSV if necessary
+        # Download CSV if necessary
         canvas_file = os.path.join(f"lab{lab:02d}", "canvas.csv")
         if force or not os.path.exists(canvas_file):
             if verbose:
@@ -205,7 +229,7 @@ def sheets(labs, sections,
             if verbose:
                 print(f'Using existing file "{canvas_file}".')
 
-        # parse CSV
+        # Parse CSV
         dtype = [("name", "U50"), ("section", int), ("group", int)]
         conv = {0: _format_name,                 # name
                 4: lambda name: name[-3:] or 0,  # section
@@ -233,31 +257,35 @@ sheets.parser = _sheets_parser
 
 
 def _introduction_parser(parser):
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="print status messages")
+    parser.add_argument("-u", "--update", action="store_true",
+                        help="update quiz code")
     parser.add_argument("-l", "--lab", type=int,
                         default=max(existing_labs, default=0),
                         metavar="number")
-    parser.add_argument("-s", "--section", type=int, nargs="+",
-                        default=15, metavar="section",
-                        help="your section number")
+    parser.add_argument("-s", "--sections", type=int, nargs="+",
+                        default=[15, 25], metavar="section",
+                        help="your section numbers")
 
 
-def introduction(lab, section):
+def introduction(lab, sections, update=False, verbose=False):
     """Create a template for introduction slides
 
     The template has three slides:
-        - title page with lab and section number
-        - sign-in sheet with assigned groups
+        - title page with lab and first section number
+        - sign-in sheets with assigned groups stacked on top of each other
         - a placeholder for the quiz code
 
     Since the quiz code changes quite frequently we put a placeholder in the
     template. Use the quiz_code command to update it before class.
     """
     intros_path = r"C:\\Users\\umthr\\OneDrive - Umich\\Documents\\Teaching" \
-                   "\\WN26 PHYSICS 251\\Introductions"
+                  r"\\WN26 PHYSICS 251\\Introductions"
     template = intros_path + r"\\Template.pptx"
 
-    img_path = f"lab{lab:02d}\\groups{section:03d}.png"
-
+    if verbose:
+        print(f'Using template at "{template}".')
     # Load template presentation
     prs = Presentation(template)
 
@@ -268,17 +296,37 @@ def introduction(lab, section):
 
     # Modify group slide
     group_slide = prs.slides[1]
-    # find the existing picture shape
-    pic_shape = next((shape for shape in group_slide.shapes
-                    if shape.shape_type == MSO_SHAPE_TYPE.PICTURE), None)
-    # replace picture and keep the same position/size
-    left   = pic_shape.left    # 2487705
-    top    = pic_shape.top     # 0
-    width  = pic_shape.width   # 6656295
-    height = pic_shape.height  # 5143500
-    group_slide.shapes._spTree.remove(pic_shape._element)
-    group_slide.shapes.add_picture(img_path, left, top,
-                                   width=width, height=height)
+    try:  # looking for an existing picture shape
+        pic_shape = next((shape for shape in group_slide.shapes
+                        if shape.shape_type == MSO_SHAPE_TYPE.PICTURE), None)
+        left   = pic_shape.left
+        top    = pic_shape.top
+        width  = pic_shape.width
+        height = pic_shape.height
+        group_slide.shapes._spTree.remove(pic_shape._element)
+        if verbose:
+            print("Replacing existing picture on group slide.")
+    except StopIteration:
+        left   = 2487705
+        top    = 0
+        width  = 6656295
+        height = 5143500
+        if verbose:
+            print("No existing picture found on group slide. "
+                  "Falling back to default position and size.")
+
+    # Add sign-in sheets for all sections on top of each other (first on top)
+    for section in reversed(sections):
+        img_path = f"lab{lab:02d}\\groups{section:03d}.png"
+        if not os.path.exists(img_path):
+            sheets([lab], [section], extensions=["png"])
+        group_slide.shapes.add_picture(img_path, left, top,
+                                       width=width, height=height)
+        
+    if update:  # quiz code
+        quiz_slide = prs.slides[2]
+        quiz_code = _get_quiz_code(lab, verbose=verbose)
+        quiz_slide.placeholders[0].text = quiz_code
 
     # Save the modified presentation
     prs.save(f"{intros_path}\\PHYS251 Lab {lab:02d}.pptx")
@@ -287,7 +335,7 @@ introduction.parser = _introduction_parser
 
 
 def _get_quiz_code(lab, verbose=False):
-    # the quiz code for each lab is defined in a quiz on Canvas
+    # The quiz code for each lab is defined in a quiz on Canvas
     quizzes = _canvas_api(f"courses/{COURSE_ID}/quizzes",
                     headers={"search_term": f"Quiz {lab:d}:"},
                     verbose=verbose)
@@ -320,6 +368,9 @@ def quiz_code(lab, verbose=False):
                   r"\\WN26 PHYSICS 251\\Introductions"
     intro = f"{intros_path}\\PHYS251 Lab {lab:02d}.pptx"
 
+    if not os.path.exists(intro):
+        raise RuntimeError(f'No slides for lab {lab:02d} found at "{intro}".')
+
     # Load template presentation
     prs = Presentation(intro)
 
@@ -336,37 +387,6 @@ def quiz_code(lab, verbose=False):
         print(f'Updated presentation "{intro}".')
 
 quiz_code.parser = _quiz_code_parser
-
-
-# make sure we are in the right directory
-os.chdir(os.path.dirname(__file__))
-
-# already existing labs on disk
-prefix = "lab"
-existing_labs = [int(entry.removeprefix(prefix)) for entry in os.listdir()
-                 if os.path.isdir(entry) and entry.startswith(prefix)]
-existing_labs.sort()
-
-
-def _number_list(string, last=max(existing_labs, default=0)):
-    f"""Parse a {NUMBER_LIST_FORMAT}
-    """
-    is_interval = lambda expr: ".." in expr
-    wrap = lambda n: last - n if n < 0 else n
-    
-    numbers = set()
-    try:
-        for part in string.split(","):
-            if is_interval(part):
-                start, end = map(int, part.split(".."))
-                numbers.update(range(start, end + 1))
-            else:
-                numbers.add(int(part))
-        return sorted(wrap(n) for n in numbers)
-    except ValueError:
-        raise ArgumentTypeError(f"invalid number list: '{string}'. "
-                                f"Must be a {NUMBER_LIST_FORMAT}.")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Utilities for using Canvas "
@@ -387,7 +407,7 @@ if __name__ == "__main__":
                                           RawDescriptionDefaultsHelpFormatter,
                                           description=description,
                                           epilog=epilog)
-        # populate subparser with command-specific arguments 
+        # Populate subparser with command-specific arguments 
         # see e.g., sheets.parser = _sheets_parser
         command.parser(subparser)
     
