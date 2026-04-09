@@ -1,22 +1,28 @@
 # Canvas tools for GSIs in PHYS/BIOPHYS 251
 
-This script currently contains three commands.
+This script currently contains four commands.
 
 ```
 $ python canvas.py -h          
-usage: canvas.py [-h] {sheets,introduction,intro,quiz_code,quiz} ...
+usage: canvas.py [-h] [-v] [-c name]
+                 {sheets,introduction,intro,slides,quiz_code,quiz,new_quiz_code,new_code} ...
 
 Utilities for using Canvas as a GSI
 
 options:
   -h, --help            show this help message and exit
+  -v, --verbose         print status messages
+  -c, --course name     the Canvas course (choices: PHYS 151 WN25, PHYS 251 WN26)
 
 commands:
-  {sheets,introduction,intro,quiz_code,quiz}
-    sheets              Draw a sign-in sheet showing what group/table students are assigned to.
-    introduction (intro)
+  {sheets,introduction,intro,slides,quiz_code,quiz,new_quiz_code,new_code}
+    sheets              Draw a sign-in sheet showing what group/table students are
+                        assigned to.
+    introduction (intro, slides)
                         Create a template for introduction slides
     quiz_code (quiz)    Update the quiz code on the introduction slides
+    new_quiz_code (new_code)
+                        Generate a new quiz code on Canvas
 ```
 
 Each of them are described below.
@@ -34,14 +40,13 @@ To use this script:
 
 ```
 $ python canvas.py sheets -h
-usage: canvas.py sheets [-h] [-v] [-f] [-e ext [ext ...]] [-l numbers [numbers ...]]
+usage: canvas.py sheets [-h] [-f] [-e ext [ext ...]] [-l numbers [numbers ...]]
                         [-s section [section ...]]
 
 Draw a sign-in sheet showing what group/table students are assigned to.
 
 options:
   -h, --help            show this help message and exit
-  -v, --verbose         print status messages (default: False)
   -f, --force           pull recent CSV from Canvas (default: False)
   -e, --extensions ext [ext ...]
                         output formats (default: ['pdf', 'png'])
@@ -67,13 +72,12 @@ slide contains the quiz code, which can be update automatically later.
 
 ```
 $ python canvas.py introduction -h
-usage: canvas.py introduction [-h] [-v] [-u] [-l number] [-s section [section ...]]
+usage: canvas.py introduction [-h] [-u] [-l number] [-s section [section ...]]
 
 Create a template for introduction slides
 
 options:
   -h, --help            show this help message and exit
-  -v, --verbose         print status messages (default: False)
   -u, --update          update quiz code (default: False)
   -l, --lab number      the lab's number (default: 12)
   -s, --sections section [section ...]
@@ -98,13 +102,12 @@ from Canvas and updates it on the third slide of the introduction.
 
 ```
 $ python canvas.py quiz_code -h   
-usage: canvas.py quiz_code [-h] [-v] [-l number]
+usage: canvas.py quiz_code [-h] [-l number]
 
 Update the quiz code on the introduction slides
 
 options:
   -h, --help        show this help message and exit
-  -v, --verbose     print status messages (default: False)
   -l, --lab number  the lab's number (default: 12)
 
 This commands pulls the latest quiz code from the Canvas API and updates
@@ -112,6 +115,26 @@ the corresponding slide in the introduction.
 ```
 
 It assumes the slides have already been created.
+
+## Generate a new quiz code on Canvas
+
+The `new_quiz_code` command generates a new random access code for a given lab
+and uploads it to Canvas. This is intended to be used in class after all
+students finished their quiz.
+
+```
+$ python canvas.py new_quiz_code -h
+usage: canvas.py new_quiz_code [-h] [-l number]
+
+Generate a new quiz code on Canvas
+
+options:
+  -h, --help        show this help message and exit
+  -l, --lab number  the lab's number (default: 12)
+
+Overwrites the quiz code on Canvas with a random number.
+Intended to be used in class after students finished the quiz.
+```
 
 ## Configuration
 
@@ -156,7 +179,7 @@ select **Download Group Category Roster CSV** under the three dots at the top.
 Save the file as `./lab01/canvas.csv` and simply run
 
 ```
-$ python canvas.py sheets -v
+$ python canvas.py -v sheets
 ```
 
 ### Automatic download
@@ -176,7 +199,7 @@ WARNING: Don't commit the TOKEN to git!
 Now you can automatically download the next labs groups from Canvas using
 
 ```
-$ python canvas.py sheets -v
+$ python canvas.py -v sheets
 ```
 
 ### Dependencies

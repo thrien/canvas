@@ -9,8 +9,11 @@ Michigan.
 import os.path
 import argparse
 from argparse import ArgumentTypeError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 import json
+from random import randrange
 # external dependencies
 # for sign-in sheets
 import numpy as np
@@ -18,6 +21,18 @@ import matplotlib.pyplot as plt
 # for introduction slides
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+
+
+class ArgumentChoicesHelpFormatter(argparse.HelpFormatter):
+    """Help formatter that shows available choices for arguments with choices."""
+    
+    def _get_help_string(self, action):
+        help_text = action.help
+        if action.choices is not None and '%(choices)' not in help_text:
+            choices_str = ', '.join(str(choice) for choice in action.choices)
+            help_text += f' (choices: {choices_str})'
+        return help_text
+    
 
 # configure help message formatting
 class RawDescriptionDefaultsHelpFormatter(
@@ -28,7 +43,8 @@ class RawDescriptionDefaultsHelpFormatter(
 # Canvas API
 API_URL = "https://umich.instructure.com/api/v1"
 TOKEN = ""
-COURSE_ID = 850281
+COURSES = {"PHYS 151 WN25": 734390,
+           "PHYS 251 WN26": 850281}
 
 # Make sure we are in the right directory
 os.chdir(os.path.dirname(__file__))
@@ -50,51 +66,80 @@ tables = [table for row in table_layout
                 if isinstance(table, int)]
 
 
-def _canvas_api(command, full_url=False, headers={}, verbose=False):
+def _canvas_api(command, full_url=False, method="GET", parameters={},
+                headers={}, data=None):
     """Call the Canvas API with the given command and parameters
     
+    For more details on the API see https://developerdocs.instructure.com/services/canvas
+
     Args:
         command: the API command, e.g., "courses/123/groups"
-        parameters: additional parameters to be sent as headers, e.g.,
-                    {"search_term": "lab 1"}
+        full_url: if True, command is treated as a complete URL
+        method: HTTP method (GET, PUT, POST, etc.)
+        headers: additional HTTP headers
+        data: request body data (for PUT/POST)
+        verbose: if True, print debug information
     Returns:
         the response as a Python object (list for JSON, else string)
     """
     if not TOKEN:
         raise RuntimeError("No Canvas API access token defined.")
     
-    request = Request(command if full_url else f"{API_URL}/{command}",
-                      headers={"Authorization": f"Bearer {TOKEN}"}|headers)
-    response = urlopen(request)
+    # see https://developerdocs.instructure.com/services/canvas/oauth2/file.oauth#using-access-tokens
+    url = command if full_url else f"{API_URL}/{command}"
+    if parameters:
+        url += "?" + "&".join(f"{key}={quote(str(value))}"
+                              for key, value in parameters.items())
+    request = Request(url,
+                      headers={"Authorization": f"Bearer {TOKEN}"}|headers,
+                      method=method)
+    if data is not None:
+        request.data = data.encode()
+    
+    # Debug output
+    if verbose > 1:
+        print(f"Request: {method} {url}")
+        print(f"Headers: {dict(request.headers)}")
+        if data is not None:
+            print(f"Data: {data}")
+    
+    try:
+        response = urlopen(request)
+    except HTTPError as error:
+        if verbose:
+            print(f"HTTP error {error.code} for {method} {url}: {error.reason}")
+        raise
+    
     if response.getheader("Content-Type").startswith("application/json"):
         content = json.load(response)
     else:
         content = response.read()
 
+    # see https://developerdocs.instructure.com/services/canvas/basics/file.pagination
     try:  # reading next pages
         links = response.getheader("Link").split(",")
         pages = {rel.removeprefix(" rel=").strip('"'): link.strip("<>")
                  for link, rel in map(lambda page: page.split(";"), links)}
-        content += _canvas_api(pages["next"], full_url=True, verbose=verbose)
+        content += _canvas_api(pages["next"], full_url=True)
     except (KeyError, AttributeError):
         pass
 
     return content
 
 
-def _canvas_import_csv(lab, verbose=False):
+def _canvas_import_csv(lab):
     # The groups for each lab are defined in a group category on Canvas
-    categories = _canvas_api(f"courses/{COURSE_ID}/group_categories",
-                             verbose=verbose)
+    # see https://developerdocs.instructure.com/services/canvas/resources/group_categories#method.group_categories.export
+    categories = _canvas_api(f"courses/{COURSE_ID}/group_categories")
+    parse_number = lambda name: int(name.lower().removeprefix("lab").strip())
     try:
         category = next(category for category in categories
-                        if category["name"].lower() == f"lab {lab:d}")
+                        if parse_number(category["name"]) == lab)
     except StopIteration:
         raise RuntimeError(f"Couldn't find groups for lab {lab:d} on Canvas.")
 
     # Ask Canvas to export the groups for this lab as a CSV
-    data = _canvas_api(f"group_categories/{category["id"]}/export",
-                       verbose=verbose)
+    data = _canvas_api(f"group_categories/{category["id"]}/export")
 
     # Save CSV on disk
     filename = os.path.join(f"lab{lab:02d}", "canvas.csv")
@@ -122,6 +167,12 @@ def _draw(names, groups, title="Groups", smallfont=18, bigfont=25,
     Args:
         names: list of the names of all students
         groups: list of the corresponding group numbers
+    Optional arguments:
+        title: the title of the figure
+        smallfont: font size for names and group numbers
+        bigfont: font size for the title
+        margin: the margin between tables as a fraction of the figure size
+        title_margin: the margin for the title as a fraction of the figure size
     Returns:
         the created matplotlib figure
     """
@@ -156,10 +207,10 @@ def _draw(names, groups, title="Groups", smallfont=18, bigfont=25,
                     fontsize=smallfont, ha="center", va="center")
 
     # Adjust spacing between subplots
-    fig.subplots_adjust(left=margin, right=1 - margin,
-                        top=1 - title_margin, bottom=margin,
-                        wspace=margin * len(table_layout[0]),
-                        hspace=margin * len(table_layout))
+    fig.subplots_adjust(left=margin, right=1-margin,
+                        top=1-title_margin, bottom=margin,
+                        wspace=margin*len(table_layout[0]),
+                        hspace=margin*len(table_layout))
 
     return fig
 
@@ -184,8 +235,6 @@ def _interval(string, last=max(existing_labs, default=0)):
 
 
 def _sheets_parser(parser):
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="print status messages")
     parser.add_argument("-f", "--force", action="store_true",
                         help="pull recent CSV from Canvas")
     parser.add_argument("-e", "--extensions", nargs="+",
@@ -202,7 +251,7 @@ def _sheets_parser(parser):
 
 
 def sheets(labs, sections,
-           extensions=["pdf", "png"], force=False, verbose=False):
+           extensions=["pdf", "png"], force=False):
     """Draw a sign-in sheet showing what group/table students are assigned to.
 
     Input and output files are organized in the current directory like this:
@@ -224,7 +273,7 @@ def sheets(labs, sections,
             if verbose:
                 print(f"Downloading lab {lab:d} from Canvas.")
             # TODO catch network error to simplify error message
-            _canvas_import_csv(lab, verbose=verbose)
+            _canvas_import_csv(lab)
         else:
             if verbose:
                 print(f'Using existing file "{canvas_file}".')
@@ -244,7 +293,8 @@ def sheets(labs, sections,
         for section in sections:
             mask = sect == section
             fig = _draw(names[mask], groups[mask],
-                    title=f"Groups for Lab {lab:02d} Section {section:03d}")
+                        title=f"Groups for Lab {lab:02d} "
+                              f"Section {section:03d}")
             for ext in extensions:
                 filename = os.path.join(f"lab{lab:02d}",
                                         f"groups{section:03d}.{ext}")
@@ -257,8 +307,6 @@ sheets.parser = _sheets_parser
 
 
 def _introduction_parser(parser):
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="print status messages")
     parser.add_argument("-u", "--update", action="store_true",
                         help="update quiz code")
     parser.add_argument("-l", "--lab", type=int,
@@ -269,7 +317,7 @@ def _introduction_parser(parser):
                         help="your section numbers")
 
 
-def introduction(lab, sections, update=False, verbose=False):
+def introduction(lab, sections, update=False):
     """Create a template for introduction slides
 
     The template has three slides:
@@ -298,7 +346,7 @@ def introduction(lab, sections, update=False, verbose=False):
     group_slide = prs.slides[1]
     try:  # looking for an existing picture shape
         pic_shape = next((shape for shape in group_slide.shapes
-                        if shape.shape_type == MSO_SHAPE_TYPE.PICTURE), None)
+                          if shape.shape_type == MSO_SHAPE_TYPE.PICTURE), None)
         left   = pic_shape.left
         top    = pic_shape.top
         width  = pic_shape.width
@@ -325,7 +373,7 @@ def introduction(lab, sections, update=False, verbose=False):
         
     if update:  # quiz code
         quiz_slide = prs.slides[2]
-        quiz_code = _get_quiz_code(lab, verbose=verbose)
+        quiz_code = _get_quiz_code(lab)
         quiz_slide.placeholders[0].text = quiz_code
 
     # Save the modified presentation
@@ -334,11 +382,11 @@ def introduction(lab, sections, update=False, verbose=False):
 introduction.parser = _introduction_parser
 
 
-def _get_quiz_code(lab, verbose=False):
+def _get_quiz_code(lab):
     # The quiz code for each lab is defined in a quiz on Canvas
+    # see https://developerdocs.instructure.com/services/canvas/resources/quizzes#method.quizzes/quizzes_api.index
     quizzes = _canvas_api(f"courses/{COURSE_ID}/quizzes",
-                    headers={"search_term": f"Quiz {lab:d}:"},
-                    verbose=verbose)
+                          parameters={"search_term": f"Quiz {lab:d}:"})
     try:
         quiz = next(quiz for quiz in quizzes
                     if quiz["title"].startswith(f"Quiz {lab:d}:"))
@@ -348,14 +396,12 @@ def _get_quiz_code(lab, verbose=False):
 
 
 def _quiz_code_parser(parser):
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="print status messages")
     parser.add_argument("-l", "--lab", type=int,
                         default=max(existing_labs, default=0),
                         metavar="number", help="the lab's number")
 
 
-def quiz_code(lab, verbose=False):
+def quiz_code(lab):
     """Update the quiz code on the introduction slides
     
     This commands pulls the latest quiz code from the Canvas API and updates
@@ -376,7 +422,7 @@ def quiz_code(lab, verbose=False):
 
     # Update quiz slide
     quiz_slide = prs.slides[2]
-    quiz_code = _get_quiz_code(lab, verbose=verbose)
+    quiz_code = _get_quiz_code(lab)
     quiz_slide.placeholders[0].text = quiz_code
     if verbose:
         print(f'Quiz code "{quiz_code}" retrieved from Canvas.')
@@ -388,13 +434,62 @@ def quiz_code(lab, verbose=False):
 
 quiz_code.parser = _quiz_code_parser
 
+
+def _new_quiz_code_parser(parser):
+    parser.add_argument("-l", "--lab", type=int,
+                        default=max(existing_labs, default=0),
+                        metavar="number", help="the lab's number")
+
+
+def new_quiz_code(lab):
+    """Generate a new quiz code on Canvas
+    
+    Overwrites the quiz code on Canvas with a random number.
+    Intended to be used in class after students finished the quiz.
+    """
+    if verbose:
+        print(f"Generating new quiz code for lab {lab:d}.")
+
+    # The quiz code for each lab is defined in a quiz on Canvas
+    # see https://developerdocs.instructure.com/services/canvas/resources/quizzes#method.quizzes-quizzes_api.show
+    quizzes = _canvas_api(f"courses/{COURSE_ID}/quizzes",
+                          parameters={"search_term": f"Quiz {lab:d}:"})
+    try:
+        quiz = next(quiz for quiz in quizzes
+                    if quiz["title"].startswith(f"Quiz {lab:d}:"))
+    except StopIteration:
+        raise RuntimeError(f"Couldn't find quiz for lab {lab:d} on Canvas.")
+    
+    new_access_code = f"{randrange(10**6):06d}"
+    parameters = {"quiz": {"access_code": new_access_code,
+                           "notify_of_update": "false"}}
+    # see https://developerdocs.instructure.com/services/canvas/resources/quizzes#method.quizzes-quizzes_api.update
+    _canvas_api(f"courses/{COURSE_ID}/quizzes/{quiz['id']}",
+                method="PUT",
+                headers={"Content-Type": "application/json"},
+                data=json.dumps(parameters))
+    
+    if verbose:
+        print(f"Access code for quiz {lab:d} changed to {new_access_code:s}.")
+
+new_quiz_code.parser = _new_quiz_code_parser
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Utilities for using Canvas "
-                                                 "as a GSI")
+                                                 "as a GSI",
+                                     formatter_class=ArgumentChoicesHelpFormatter)
     
-    commands = [sheets, introduction, quiz_code]
-    aliases = {"introduction": ["intro"],
-               "quiz_code": ["quiz"]}
+    parser.add_argument("-v", "--verbose", action="count", default=0,
+                        help="print status messages")
+    parser.add_argument("-c", "--course", choices=COURSES.keys(),
+                        default="PHYS 251 WN26", help="the Canvas course",
+                        metavar="name")
+    
+    commands = [sheets, introduction, quiz_code, new_quiz_code]
+    aliases = {"introduction": ["intro", "slides"],
+               "quiz_code": ["quiz"],
+               "new_quiz_code": ["new_code"]}
     subparsers = parser.add_subparsers(dest="command",
                                        title="commands",
                                        required=True)
@@ -414,6 +509,12 @@ if __name__ == "__main__":
     
     args = vars(parser.parse_args())
 
+    # Pop global arguments and find the command to execute
+    verbose = args.pop("verbose")
+    course = args.pop("course")
+    COURSE_ID = COURSES[course]
+    if verbose:
+        print(f'Using course "{course}" with ID {COURSE_ID:d}.')
     command_name = args.pop("command")
     try:
         command = next(command for command in commands
