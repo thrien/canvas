@@ -1,9 +1,30 @@
-# Canvas tools for GSI in PHYS/BIOPHYS 251
+# Canvas tools for GSIs in PHYS/BIOPHYS 251
+
+This script currently contains three commands.
+
+```
+$ python canvas.py -h          
+usage: canvas.py [-h] {sheets,introduction,intro,quiz_code,quiz} ...
+
+Utilities for using Canvas as a GSI
+
+options:
+  -h, --help            show this help message and exit
+
+commands:
+  {sheets,introduction,intro,quiz_code,quiz}
+    sheets              Draw a sign-in sheet showing what group/table students are assigned to.
+    introduction (intro)
+                        Create a template for introduction slides
+    quiz_code (quiz)    Update the quiz code on the introduction slides
+```
+
+Each of them are described below.
 
 ## Automatic sign-in sheets with groups
 
-This command draws a sign-in sheet showing what group/table students are
-assigned to. For example:
+The `sheets` command draws a sign-in sheet showing what group/table students
+are assigned to. For example:
 
 ![Example group/table layout with fake names](example.png)
 
@@ -13,8 +34,8 @@ To use this script:
 
 ```
 $ python canvas.py sheets -h
-usage: canvas.py sheets [-h] [-v] [-f] [-e ext [ext ...]] [-l number]
-                 [-s section [section ...]]
+usage: canvas.py sheets [-h] [-v] [-f] [-e ext [ext ...]] [-l numbers [numbers ...]]
+                        [-s section [section ...]]
 
 Draw a sign-in sheet showing what group/table students are assigned to.
 
@@ -24,11 +45,12 @@ options:
   -f, --force           pull recent CSV from Canvas (default: False)
   -e, --extensions ext [ext ...]
                         output formats (default: ['pdf', 'png'])
-  -l, --lab number      -1 means next lab (default: -1)
+  -l, --labs numbers [numbers ...]
+                        integers or intervals like a..b (default: [13])
   -s, --sections section [section ...]
                         your section numbers (default: [15, 25])
 
-Files are organized in the current directory like this:
+Input and output files are organized in the current directory like this:
     .
     ├── canvas.py
     └── lab01
@@ -39,17 +61,55 @@ Files are organized in the current directory like this:
 
 ## Automatic templates for introduction slides
 
-This command creates a PowerPoint presentation from a template, changes the
-title and inserts the sign-in sheet on the second slide. The third slide
-contains the quiz code, which can be update automatically later.
+The `introduction` command creates a PowerPoint presentation from a template,
+changes the title and inserts the sign-in sheet on the second slide. The third
+slide contains the quiz code, which can be update automatically later.
+
+```
+$ python canvas.py introduction -h
+usage: canvas.py introduction [-h] [-v] [-u] [-l number] [-s section [section ...]]
+
+Create a template for introduction slides
+
+options:
+  -h, --help            show this help message and exit
+  -v, --verbose         print status messages (default: False)
+  -u, --update          update quiz code (default: False)
+  -l, --lab number      the lab's number (default: 12)
+  -s, --sections section [section ...]
+                        your section numbers (default: [15, 25])
+
+The template has three slides:
+    - title page with lab and first section number
+    - sign-in sheets stacked on top of each other
+    - a placeholder for the quiz code
+
+Since the quiz code changes quite frequently we put a placeholder in the
+template. Use the quiz_code command to update it before class.
+```
 
 This part of the script has not been fully configured yet and contains some
 hardcoded paths, chosen for my specific setup.
 
 ## Automatically update the quiz code
 
-This command pulls the current quiz access for the specified lab from Canvas
-and updates it on the third slide of the introduction.
+The `quiz_code` command pulls the current quiz access for the specified lab
+from Canvas and updates it on the third slide of the introduction.
+
+```
+$ python canvas.py quiz_code -h   
+usage: canvas.py quiz_code [-h] [-v] [-l number]
+
+Update the quiz code on the introduction slides
+
+options:
+  -h, --help        show this help message and exit
+  -v, --verbose     print status messages (default: False)
+  -l, --lab number  the lab's number (default: 12)
+
+This commands pulls the latest quiz code from the Canvas API and updates
+the corresponding slide in the introduction.
+```
 
 It assumes the slides have already been created.
 
@@ -59,7 +119,7 @@ You might want to configure a few things before using this script.
 
 ### Table layout
 
-The table layout is defined like this:
+The table layout for the sign-in sheets is defined like this:
 
 ```
 table_layout = [[ 1 , 'I', '.'],
@@ -96,7 +156,7 @@ select **Download Group Category Roster CSV** under the three dots at the top.
 Save the file as `./lab01/canvas.csv` and simply run
 
 ```
-$ python draw_sheets.py -v
+$ python canvas.py sheets -v
 ```
 
 ### Automatic download
@@ -116,7 +176,7 @@ WARNING: Don't commit the TOKEN to git!
 Now you can automatically download the next labs groups from Canvas using
 
 ```
-$ python draw_sheets.py -v
+$ python canvas.py sheets -v
 ```
 
 ### Dependencies
@@ -148,7 +208,7 @@ them.
 
 To schedule this script to run once a week until it succeds define a
 [systemd timer](https://wiki.archlinux.org/title/Systemd/Timers) like
-`canvas_groups.timer` in `~/.config/systemd/user`.
+`canvas_groups.timer` in `~/.config/systemd/user`. 
 
 ```
 [Unit]
@@ -163,7 +223,7 @@ WantedBy=timers.target
 ```
 
 It triggers a systemd service like `canvas_groups.service` in the same
-directory.
+directory. Change the `/path/to/your/directory/` to match your setup.
 
 ```
 [Unit]
@@ -178,7 +238,7 @@ StartLimitBurst=28
 [Service]
 Type=oneshot
 WorkingDirectory=/path/to/your/directory
-ExecStart=/path/to/your/directory/draw_sheets.py
+ExecStart=/path/to/your/directory/canvas.py sheets
 
 # Retry logic
 Restart=on-failure
@@ -203,7 +263,7 @@ Alternatively, use [cron](https://wiki.archlinux.org/title/Cron) and define a
 simple `crontab` file that runs the script once a week on Mondays at 12PM.
 
 ```
-0 12 * * 1 /path/to/draw_sheets.py
+0 12 * * 1 /path/to/canvas.py sheets
 ```
 
 Load it with

@@ -207,7 +207,7 @@ def sheets(labs, sections,
 
     Input and output files are organized in the current directory like this:
         .
-        ├── draw_sheets.py
+        ├── canvas.py
         └── lab01
             ├── canvas.csv
             ├── groups015.png
