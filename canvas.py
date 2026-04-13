@@ -6,10 +6,9 @@ It is intented to be used by GSIs for PHYSICS 151/251 at the University of
 Michigan.
 """
 # standard library
-import os.path
+import os
 import argparse
-from argparse import ArgumentTypeError
-from urllib.parse import quote
+from urllib.parse import quote, unquote_plus
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 import json
@@ -25,7 +24,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 class ArgumentChoicesHelpFormatter(argparse.HelpFormatter):
     """Help formatter that shows available choices for arguments with choices."""
-    
+
     def _get_help_string(self, action):
         help_text = action.help
         if action.choices is not None and '%(choices)' not in help_text:
@@ -42,9 +41,10 @@ class RawDescriptionDefaultsHelpFormatter(
 
 # Canvas API
 API_URL = "https://umich.instructure.com/api/v1"
-TOKEN = ""
+TOKEN = os.getenv("CANVAS_API_TOKEN")
 COURSES = {"PHYS 151 WN25": 734390,
-           "PHYS 251 WN26": 850281}
+           "PHYS 251 WN26": 850281,
+           "PHYS 251 WN26 GSI": 826079}
 
 # Make sure we are in the right directory
 os.chdir(os.path.dirname(__file__))
@@ -84,7 +84,7 @@ def _canvas_api(command, full_url=False, method="GET", parameters={},
     """
     if not TOKEN:
         raise RuntimeError("No Canvas API access token defined.")
-    
+
     # see https://developerdocs.instructure.com/services/canvas/oauth2/file.oauth#using-access-tokens
     url = command if full_url else f"{API_URL}/{command}"
     if parameters:
@@ -95,21 +95,21 @@ def _canvas_api(command, full_url=False, method="GET", parameters={},
                       method=method)
     if data is not None:
         request.data = data.encode()
-    
+
     # Debug output
-    if verbose > 1:
+    if verbose > 2:
         print(f"Request: {method} {url}")
         print(f"Headers: {dict(request.headers)}")
         if data is not None:
             print(f"Data: {data}")
-    
+
     try:
         response = urlopen(request)
     except HTTPError as error:
         if verbose:
             print(f"HTTP error {error.code} for {method} {url}: {error.reason}")
         raise
-    
+
     if response.getheader("Content-Type").startswith("application/json"):
         content = json.load(response)
     else:
@@ -271,7 +271,7 @@ def sheets(labs, sections,
         canvas_file = os.path.join(f"lab{lab:02d}", "canvas.csv")
         if force or not os.path.exists(canvas_file):
             if verbose:
-                print(f"Downloading lab {lab:d} from Canvas.")
+                print(f"Downloading groups for lab {lab:d} from Canvas.")
             # TODO catch network error to simplify error message
             _canvas_import_csv(lab)
         else:
@@ -370,7 +370,7 @@ def introduction(lab, sections, update=False):
             sheets([lab], [section], extensions=["png"])
         group_slide.shapes.add_picture(img_path, left, top,
                                        width=width, height=height)
-        
+
     if update:  # quiz code
         quiz_slide = prs.slides[2]
         quiz_code = _get_quiz_code(lab)
@@ -459,7 +459,7 @@ def new_quiz_code(lab):
                     if quiz["title"].startswith(f"Quiz {lab:d}:"))
     except StopIteration:
         raise RuntimeError(f"Couldn't find quiz for lab {lab:d} on Canvas.")
-    
+
     new_access_code = f"{randrange(10**6):06d}"
     parameters = {"quiz": {"access_code": new_access_code,
                            "notify_of_update": "false"}}
@@ -468,25 +468,84 @@ def new_quiz_code(lab):
                 method="PUT",
                 headers={"Content-Type": "application/json"},
                 data=json.dumps(parameters))
-    
+
     if verbose:
         print(f"Access code for quiz {lab:d} changed to {new_access_code:s}.")
 
 new_quiz_code.parser = _new_quiz_code_parser
 
 
+def _get_worksheet(lab, path="Physics 251 GSI Resources/Lab Worksheets"):
+    # The worksheet for each lab is defined in a file on Canvas
+    # see https://developerdocs.instructure.com/services/canvas/resources/files#method.files.index
+    folders = _canvas_api(f"courses/{COURSE_ID}/folders/by_path/{quote(path)}")
+    files = _canvas_api(f"folders/{folders[-1]['id']}/files",
+                        parameters={"search_term": f"Lab {lab:d} -"})
+    if verbose > 1:
+        print(f'Found {len(files)} file{'' if len(files) == 1 else 's'} '
+              f'in folder "{path}" matching "Lab {lab:d} -".')
+        for file in files:
+            print(f'  "{file["display_name"]}"',
+                  f'unquoted filename: "{unquote_plus(file["filename"])}"',
+                  f'id: {file["id"]}',
+                  f'url: {file["url"]})', sep="\n    ")
+    try:
+        file = next(file for file in files
+                    if file["display_name"].startswith(f"Lab {lab:d} -"))
+    except StopIteration:
+        raise RuntimeError(f"Couldn't find worksheet for lab {lab:d} on Canvas.")
+    content = urlopen(file["url"]).read()
+    return content
+
+
+def _worksheet_parser(parser):
+    parser.add_argument("-l", "--labs", nargs="+", type=_interval,
+                        action=FlatListAction,
+                        default=[max(existing_labs, default=0) + 1],
+                        metavar="number", help="the lab's number")
+    parser.add_argument("-p", "--path", type=str, metavar="path",
+                        default="Physics 251 GSI Resources/Lab Worksheets",
+                        help="the path to the worksheet file on Canvas")
+
+
+def worksheet(labs, path="Physics 251 GSI Resources/Lab Worksheets"):
+    """Download the worksheet for the given lab from Canvas
+
+    The worksheets are stored in another Canvas course (at least for PHYS 251
+    WN26). Define another Canvas course ID with " GSI" appended to the name and
+    update the path to the top folder if necessary.
+    """
+    if not TOKEN:
+        raise RuntimeError("No Canvas API access token defined.")
+    
+    for lab in labs:
+        worksheet = _get_worksheet(lab, path=path)
+        with urlopen(worksheet["url"]) as response:
+            content = response.read()
+        extension = os.path.splitext(worksheet["display_name"])[-1]
+        filename = f"lab{lab:02d}\\worksheet.{extension}"
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        with open(filename, "wb") as file:
+            file.write(content)
+        if verbose:
+            print(f'Worksheet for lab {lab:d} written to "{filename}".')
+
+worksheet.parser = _worksheet_parser
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Utilities for using Canvas "
                                                  "as a GSI",
                                      formatter_class=ArgumentChoicesHelpFormatter)
-    
+
     parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="print status messages")
     parser.add_argument("-c", "--course", choices=COURSES.keys(),
                         default="PHYS 251 WN26", help="the Canvas course",
                         metavar="name")
-    
-    commands = [sheets, introduction, quiz_code, new_quiz_code]
+
+    commands = [sheets, introduction, quiz_code, new_quiz_code, worksheet]
     aliases = {"introduction": ["intro", "slides"],
                "quiz_code": ["quiz"],
                "new_quiz_code": ["new_code"]}
@@ -506,20 +565,24 @@ if __name__ == "__main__":
         # Populate subparser with command-specific arguments 
         # see e.g., sheets.parser = _sheets_parser
         command.parser(subparser)
-    
+
     args = vars(parser.parse_args())
 
     # Pop global arguments and find the command to execute
     verbose = args.pop("verbose")
-    course = args.pop("course")
-    COURSE_ID = COURSES[course]
-    if verbose:
-        print(f'Using course "{course}" with ID {COURSE_ID:d}.')
+
     command_name = args.pop("command")
     try:
         command = next(command for command in commands
                        if command.__name__ == command_name)
     except StopIteration:
         raise RuntimeError(f'Unknown command: "{command_name}"')
-    
+
+    course = args.pop("course")
+    if command == worksheet:
+        course += " GSI"
+    COURSE_ID = COURSES[course]
+    if verbose:
+        print(f'Using course "{course}" with ID {COURSE_ID:d}.')
+
     command(**args)

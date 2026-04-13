@@ -1,21 +1,22 @@
 # Canvas tools for GSIs in PHYS/BIOPHYS 251
 
-This script currently contains four commands.
+This script currently contains five commands.
 
 ```
-$ python canvas.py -h          
+$ python canvas.py -h             
 usage: canvas.py [-h] [-v] [-c name]
-                 {sheets,introduction,intro,slides,quiz_code,quiz,new_quiz_code,new_code} ...
+                 {sheets,introduction,intro,slides,quiz_code,quiz,new_quiz_code,new_code,worksheet} ...
 
 Utilities for using Canvas as a GSI
 
 options:
   -h, --help            show this help message and exit
   -v, --verbose         print status messages
-  -c, --course name     the Canvas course (choices: PHYS 151 WN25, PHYS 251 WN26)
+  -c, --course name     the Canvas course (choices: PHYS 151 WN25, PHYS 251 WN26,
+                        PHYS 251 WN26 GSI)
 
 commands:
-  {sheets,introduction,intro,slides,quiz_code,quiz,new_quiz_code,new_code}
+  {sheets,introduction,intro,slides,quiz_code,quiz,new_quiz_code,new_code,worksheet}
     sheets              Draw a sign-in sheet showing what group/table students are
                         assigned to.
     introduction (intro, slides)
@@ -23,6 +24,7 @@ commands:
     quiz_code (quiz)    Update the quiz code on the introduction slides
     new_quiz_code (new_code)
                         Generate a new quiz code on Canvas
+    worksheet           Download the worksheet for the given lab from Canvas
 ```
 
 Each of them are described below.
@@ -30,13 +32,7 @@ Each of them are described below.
 ## Automatic sign-in sheets with groups
 
 The `sheets` command draws a sign-in sheet showing what group/table students
-are assigned to. For example:
-
-![Example group/table layout with fake names](example.png)
-
-### Usage
-
-To use this script:
+are assigned to.
 
 ```
 $ python canvas.py sheets -h
@@ -63,6 +59,10 @@ Input and output files are organized in the current directory like this:
         ├── groups015.png
         └── groups025.png
 ```
+
+### Example
+
+![Example group/table layout with fake names](example.png)
 
 ## Automatic templates for introduction slides
 
@@ -136,6 +136,29 @@ Overwrites the quiz code on Canvas with a random number.
 Intended to be used in class after students finished the quiz.
 ```
 
+## Download Worksheets
+
+The `worksheet` command downloads the worksheet(s) for the specified lab(s) and
+stores them in the same folders as the sign-in sheets.
+
+```
+python canvas.py worksheet -h
+usage: canvas.py worksheet [-h] [-l number [number ...]] [-p path]
+
+Download the worksheet for the given lab from Canvas
+
+options:
+  -h, --help            show this help message and exit
+  -l, --labs number [number ...]
+                        the lab's number (default: [13])
+  -p, --path path       the path to the worksheet file on Canvas (default: Physics
+                        251 GSI Resources/Lab Worksheets)
+
+The worksheets are stored in another Canvas course (at least for PHYS 251
+WN26). Define another Canvas course ID with " GSI" appended to the name and
+update the path to the top folder if necessary.
+```
+
 ## Configuration
 
 You might want to configure a few things before using this script.
@@ -143,7 +166,6 @@ You might want to configure a few things before using this script.
 ### Table layout
 
 The table layout for the sign-in sheets is defined like this:
-
 ```
 table_layout = [[ 1 , 'I', '.'],
                 [ 2 , '.',  8 ],
@@ -177,7 +199,6 @@ For example, for Lab 1 navigate to **People > Groups > Lab 1**, which is
 select **Download Group Category Roster CSV** under the three dots at the top.
 
 Save the file as `./lab01/canvas.csv` and simply run
-
 ```
 $ python canvas.py -v sheets
 ```
@@ -188,16 +209,29 @@ You can use the Canvas API to automatically download the CSV when needed. This
 requires an access token (i.e. password) that you can generate under
 **Account > Settings > Approved Integrations > New Access Token**.
 
-Copy the token into
+Ideally you store this token in an environment variable on your machine and use
+```
+TOKEN = os.getenv("CANVAS_API_TOKEN")
+```
 
+For Linux system add
+```
+export CANVAS_API_TOKEN="<your_token>"
+```
+to `~/.profile`.
+
+On Windows open a shell (`Ctrl-R "cmd"`) and type
+```
+setx CANVAS_API_TOKEN "<your_token>"
+```
+
+For simplicity you can also just copy the token into
 ```
 TOKEN = "<your_access_token_here>"
 ```
-
-WARNING: Don't commit the TOKEN to git!
+WARNING: Don't commit the TOKEN to GitHub!
 
 Now you can automatically download the next labs groups from Canvas using
-
 ```
 $ python canvas.py -v sheets
 ```
@@ -269,13 +303,10 @@ RestartSec=6h
 ```
 
 Load the new definitions with
-
 ```
 $ systemctl --user daemon-reload
 ```
-
 and start and enable the timer with
-
 ```
 $ systemctl --user enable --now myscript.timer
 ```
@@ -290,7 +321,6 @@ simple `crontab` file that runs the script once a week on Mondays at 12PM.
 ```
 
 Load it with
-
 ```
 $ crontab /path/to/crontab
 ```
