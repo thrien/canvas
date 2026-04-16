@@ -23,7 +23,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 
 class ArgumentChoicesHelpFormatter(argparse.HelpFormatter):
-    """Help formatter that shows available choices for arguments with choices."""
+    """Help formatter that shows available choices for arguments."""
 
     def _get_help_string(self, action):
         help_text = action.help
@@ -70,7 +70,8 @@ def _canvas_api(command, full_url=False, method="GET", parameters={},
                 headers={}, data=None):
     """Call the Canvas API with the given command and parameters
     
-    For more details on the API see https://developerdocs.instructure.com/services/canvas
+    For more details on the API see:
+    https://developerdocs.instructure.com/services/canvas
 
     Args:
         command: the API command, e.g., "courses/123/groups"
@@ -340,7 +341,7 @@ def introduction(lab, sections, update=False):
     # Modify title slide
     title_slide = prs.slides[0]
     subtitle = title_slide.placeholders[1]
-    subtitle.text = f"Lab {lab:02d} - Section {section:03d}"
+    subtitle.text = f"Lab {lab:02d} - Section {sections[0]:03d}"
 
     # Modify group slide
     group_slide = prs.slides[1]
@@ -377,7 +378,11 @@ def introduction(lab, sections, update=False):
         quiz_slide.placeholders[0].text = quiz_code
 
     # Save the modified presentation
-    prs.save(f"{intros_path}\\PHYS251 Lab {lab:02d}.pptx")
+    path = f"{intros_path}\\PHYS251 Lab {lab:02d}.pptx"
+    prs.save(path)
+
+    if verbose:
+        print(f'Introduction slides for lab {lab:d} saved to "{path}".')
 
 introduction.parser = _introduction_parser
 
@@ -493,7 +498,8 @@ def _get_worksheet(lab, path="Physics 251 GSI Resources/Lab Worksheets"):
         file = next(file for file in files
                     if file["display_name"].startswith(f"Lab {lab:d} -"))
     except StopIteration:
-        raise RuntimeError(f"Couldn't find worksheet for lab {lab:d} on Canvas.")
+        raise RuntimeError("Couldn't find worksheet "
+                           f"for lab {lab:d} on Canvas.")
     content = urlopen(file["url"]).read()
     return content
 
@@ -537,7 +543,8 @@ worksheet.parser = _worksheet_parser
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Utilities for using Canvas "
                                                  "as a GSI",
-                                     formatter_class=ArgumentChoicesHelpFormatter)
+                                     formatter_class=
+                                     ArgumentChoicesHelpFormatter)
 
     parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="print status messages")
@@ -565,6 +572,7 @@ if __name__ == "__main__":
         # Populate subparser with command-specific arguments 
         # see e.g., sheets.parser = _sheets_parser
         command.parser(subparser)
+        subparser.set_defaults(func=command)
 
     args = vars(parser.parse_args())
 
@@ -572,11 +580,11 @@ if __name__ == "__main__":
     verbose = args.pop("verbose")
 
     command_name = args.pop("command")
-    try:
-        command = next(command for command in commands
-                       if command.__name__ == command_name)
-    except StopIteration:
-        raise RuntimeError(f'Unknown command: "{command_name}"')
+    command = args.pop("func")
+    if verbose:
+        if command_name not in [command.__name__ for command in commands]:
+            print(f'Command "{command_name}" is an alias '
+                  f'for "{command.__name__}".')
 
     course = args.pop("course")
     if command == worksheet:
