@@ -17,6 +17,8 @@ from random import randrange
 # for sign-in sheets
 import numpy as np
 import matplotlib.pyplot as plt
+# for gradebooks
+import pandas as pd
 # for introduction slides
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
@@ -540,6 +542,123 @@ def worksheet(labs, path="Physics 251 GSI Resources/Lab Worksheets"):
 worksheet.parser = _worksheet_parser
 
 
+def _letter_grade(grade):
+    """FINAL LETTER GRADE CALCULATOR
+
+    PHYSICS 151, 251
+    WINTER 2025
+    Version 5.2
+    Liam Daly, Blake Bottesi, Michelle Thran
+    Last updated: 4/22/2025
+    """
+    if grade >= 99:
+        return 'A+'
+    if grade >= 94:
+        return 'A'
+    if grade >= 90:
+        return 'A-'
+    if grade >= 87:
+        return 'B+'
+    if grade >= 84:
+        return 'B'
+    if grade >= 80:
+        return 'B-'
+    if grade >= 77:
+        return 'C+'
+    if grade >= 73:
+        return 'C'
+    if grade >= 70:
+        return 'C-'
+    if grade >= 67:
+        return 'D+'
+    if grade >= 63:
+        return 'D'
+    if grade >= 60:
+        return 'D-'
+    else:
+        return 'E'
+
+
+def _get_grades(df):
+    """FINAL LETTER GRADE CALCULATOR
+
+    PHYSICS 151, 251
+    WINTER 2025
+    Version 5.2
+    Liam Daly, Blake Bottesi, Michelle Thran
+    Last updated: 4/22/2025
+    """
+    df['Letter Grade'] = df['Final Score'].apply(_letter_grade)
+    grades = df[['Student', 'Section', 'Final Score', 'Letter Grade']]
+    return grades
+
+
+def _uploadable(df):
+    """FINAL LETTER GRADE CALCULATOR
+
+    PHYSICS 151, 251
+    WINTER 2025
+    Version 5.2
+    Liam Daly, Blake Bottesi, Michelle Thran
+    Last updated: 4/22/2025
+    """
+    grades = df[['SIS User ID', 'Letter Grade']]
+    return grades
+
+
+def _final_grades_parser(parser):
+    parser.add_argument("gradebook",
+                        help="path to gradebook exported from Canvas")
+    parser.add_argument("-r", "--readable", type=str, metavar="path",
+                        #default=<parsed from function signature>,
+                        help="file to write human-readable grades")
+    parser.add_argument("-u", "--uploadable", type=str, metavar="path",
+                        #default=<parsed from function signature>,
+                        help="file to write machine-readable grades")
+
+
+def final_grades(gradebook, readable="grades/human-readable.csv",
+                 uploadable="grades/wolverine_access.csv"):
+    """FINAL LETTER GRADE CALCULATOR
+
+    PHYSICS 151, 251
+    WINTER 2025
+    Version 5.2
+    Liam Daly, Blake Bottesi, Michelle Thran
+    Last updated: 4/22/2025
+    """
+    # Deletes empty rows and test student
+    df = pd.read_csv(gradebook, skiprows=[1, 2])
+    df = df.drop(df.index[-1])
+    if verbose:
+        print(f'Successfully read gradebook "{gradebook}" as CSV.')
+
+    # ignores PHYSICS vs BIOPHYS distinction
+    df['Section'] = df['Section'].str.slice(-3)
+
+    # Sorts the gradebook first by section, then by student last name
+    df = df.sort_values(by=['Section', 'Student'])
+
+    final_grades = _get_grades(df)
+
+    final_grades.to_csv(readable, index=False)
+    if verbose:
+        print(f'Human-readable final grades written to "{readable}".')
+
+    # Use this csv to cross-reference against canvas to ensure
+    # accuracy of letter grades
+    uploadable_grades = _uploadable(df)
+    uploadable_grades.to_csv(uploadable,
+                             index=False, header=None, float_format=int)
+    if verbose:
+        print(f'Machine-readable file written to "{uploadable}.')
+
+    # Use this csv to upload letter grades to wolverine access.
+    # Not intended for direct reading
+
+final_grades.parser = _final_grades_parser
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Utilities for using Canvas "
                                                  "as a GSI",
@@ -552,10 +671,12 @@ if __name__ == "__main__":
                         default="PHYS 251 WN26", help="the Canvas course",
                         metavar="name")
 
-    commands = [sheets, introduction, quiz_code, new_quiz_code, worksheet]
+    commands = [sheets, introduction, quiz_code, new_quiz_code, worksheet,
+                final_grades]
     aliases = {"introduction": ["intro", "slides"],
                "quiz_code": ["quiz"],
-               "new_quiz_code": ["new_code"]}
+               "new_quiz_code": ["new_code"],
+               "final_grades": ["grades"]}
     subparsers = parser.add_subparsers(dest="command",
                                        title="commands",
                                        required=True)
