@@ -8,6 +8,7 @@ Michigan.
 # standard library
 import os
 import argparse
+import inspect
 from urllib.parse import quote, unquote_plus
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
@@ -106,12 +107,7 @@ def _canvas_api(command, full_url=False, method="GET", parameters={},
         if data is not None:
             print(f"Data: {data}")
 
-    try:
-        response = urlopen(request)
-    except HTTPError as error:
-        if verbose:
-            print(f"HTTP error {error.code} for {method} {url}: {error.reason}")
-        raise
+    response = urlopen(request)
 
     if response.getheader("Content-Type").startswith("application/json"):
         content = json.load(response)
@@ -238,10 +234,10 @@ def _interval(string, last=max(existing_labs, default=0)):
 
 
 def _sheets_parser(parser):
-    parser.add_argument("-f", "--force", action="store_true",
+    parser.add_argument("-f", "--force", action=argparse.BooleanOptionalAction,
                         help="pull recent CSV from Canvas")
     parser.add_argument("-e", "--extensions", nargs="+",
-                        default=["pdf", "png"],
+                        #default=<parsed from function signature>,
                         metavar="ext", help="output formats")
     parser.add_argument("-l", "--labs", type=_interval, nargs="+",
                         action=FlatListAction,
@@ -310,7 +306,8 @@ sheets.parser = _sheets_parser
 
 
 def _introduction_parser(parser):
-    parser.add_argument("-u", "--update", action="store_true",
+    parser.add_argument("-u", "--update",
+                        action=argparse.BooleanOptionalAction,
                         help="update quiz code")
     parser.add_argument("-l", "--lab", type=int,
                         default=max(existing_labs, default=0),
@@ -512,7 +509,7 @@ def _worksheet_parser(parser):
                         default=[max(existing_labs, default=0) + 1],
                         metavar="number", help="the lab's number")
     parser.add_argument("-p", "--path", type=str, metavar="path",
-                        default="Physics 251 GSI Resources/Lab Worksheets",
+                        #default=<parsed from function signature>,
                         help="the path to the worksheet file on Canvas")
 
 
@@ -693,7 +690,12 @@ if __name__ == "__main__":
         # Populate subparser with command-specific arguments 
         # see e.g., sheets.parser = _sheets_parser
         command.parser(subparser)
-        subparser.set_defaults(func=command)
+        # Read defaults from function signatures
+        defaults = {param.name: param.default for param in
+                    inspect.signature(command).parameters.values()
+                    if param.default is not inspect.Parameter.empty}
+        # Set default function to call and its defaults
+        subparser.set_defaults(func=command, **defaults)
 
     args = vars(parser.parse_args())
 
