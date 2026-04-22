@@ -302,8 +302,6 @@ def sheets(labs, sections,
                     print(f'Output written to "{filename}"')
             plt.close(fig)
 
-sheets.parser = _sheets_parser
-
 
 def _introduction_parser(parser):
     parser.add_argument("-u", "--update",
@@ -383,8 +381,6 @@ def introduction(lab, sections, update=False):
     if verbose:
         print(f'Introduction slides for lab {lab:d} saved to "{path}".')
 
-introduction.parser = _introduction_parser
-
 
 def _get_quiz_code(lab):
     # The quiz code for each lab is defined in a quiz on Canvas
@@ -436,8 +432,6 @@ def quiz_code(lab):
     if verbose:
         print(f'Updated presentation "{intro}".')
 
-quiz_code.parser = _quiz_code_parser
-
 
 def _new_quiz_code_parser(parser):
     parser.add_argument("-l", "--lab", type=int,
@@ -475,8 +469,6 @@ def new_quiz_code(lab):
 
     if verbose:
         print(f"Access code for quiz {lab:d} changed to {new_access_code:s}.")
-
-new_quiz_code.parser = _new_quiz_code_parser
 
 
 def _get_worksheet(lab, path="Physics 251 GSI Resources/Lab Worksheets"):
@@ -535,8 +527,6 @@ def worksheet(labs, path="Physics 251 GSI Resources/Lab Worksheets"):
             file.write(content)
         if verbose:
             print(f'Worksheet for lab {lab:d} written to "{filename}".')
-
-worksheet.parser = _worksheet_parser
 
 
 def _letter_grade(grade):
@@ -640,7 +630,7 @@ def final_grades(gradebook, readable="grades/human-readable.csv",
 
     final_grades.to_csv(readable, index=False)
     if verbose:
-        print(f'Human-readable final grades written to "{readable}".')
+        print(f'Human-readable final grades written to "{readable}" as CSV.')
 
     # Use this csv to cross-reference against canvas to ensure
     # accuracy of letter grades
@@ -648,12 +638,10 @@ def final_grades(gradebook, readable="grades/human-readable.csv",
     uploadable_grades.to_csv(uploadable,
                              index=False, header=None, float_format=int)
     if verbose:
-        print(f'Machine-readable file written to "{uploadable}.')
+        print(f'Machine-readable file written to "{uploadable}" as CSV.')
 
     # Use this csv to upload letter grades to wolverine access.
     # Not intended for direct reading
-
-final_grades.parser = _final_grades_parser
 
 
 if __name__ == "__main__":
@@ -670,10 +658,10 @@ if __name__ == "__main__":
 
     commands = [sheets, introduction, quiz_code, new_quiz_code, worksheet,
                 final_grades]
-    aliases = {"introduction": ["intro", "slides"],
-               "quiz_code": ["quiz"],
+    aliases = {"introduction":  ["intro", "slides"],
+               "quiz_code":     ["quiz"],
                "new_quiz_code": ["new_code"],
-               "final_grades": ["grades"]}
+               "final_grades":  ["grades"]}
     subparsers = parser.add_subparsers(dest="command",
                                        title="commands",
                                        required=True)
@@ -687,14 +675,19 @@ if __name__ == "__main__":
                                           description=description,
                                           help=description,
                                           epilog=epilog)
-        # Populate subparser with command-specific arguments 
-        # see e.g., sheets.parser = _sheets_parser
-        command.parser(subparser)
+        
+        # Construct subparser with command-specific arguments
+        if hasattr(command, "parser"):  # e.g., sheets.parser = _sheets_parser
+            constructor = command.parser
+        else:  # find a constructor by its name
+            constructor = globals()[f"_{command.__name__}_parser"]
+        constructor(subparser)
+
         # Read defaults from function signatures
         defaults = {param.name: param.default for param in
                     inspect.signature(command).parameters.values()
                     if param.default is not inspect.Parameter.empty}
-        # Set default function to call and its defaults
+        # Set default function to call and its defaults arguments
         subparser.set_defaults(func=command, **defaults)
 
     args = vars(parser.parse_args())
