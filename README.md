@@ -1,6 +1,6 @@
 # Canvas tools for GSIs in PHYS/BIOPHYS 251
 
-This script currently contains five commands.
+This script currently contains six commands.
 
 ```
 $ python canvas.py -h             
@@ -142,7 +142,7 @@ The `worksheet` command downloads the worksheet(s) for the specified lab(s) and
 stores them in the same folders as the sign-in sheets.
 
 ```
-python canvas.py worksheet -h
+$ python canvas.py worksheet -h
 usage: canvas.py worksheet [-h] [-l number [number ...]] [-p path]
 
 Download the worksheet for the given lab from Canvas
@@ -158,6 +158,39 @@ The worksheets are stored in another Canvas course (at least for PHYS 251
 WN26). Define another Canvas course ID with " GSI" appended to the name and
 update the path to the top folder if necessary.
 ```
+
+## Calculate final letter grades
+
+The `final_grades` command converts the final scores (in %) from a gradebook
+exported from Canvas into letter grades and prepares both a human-readable
+gradebook to check the legitimacy of the results and a machine-readable CSV
+file that can be uploaded to Wolverine Access.
+
+```
+python canvas.py final_grades -h
+usage: canvas.py final_grades [-h] [-r path] [-u path] gradebook
+
+FINAL LETTER GRADE CALCULATOR
+
+positional arguments:
+  gradebook             path to gradebook exported from Canvas
+
+options:
+  -h, --help            show this help message and exit
+  -r, --readable path   file to write human-readable grades (default: grades/human-readable.csv)
+  -u, --uploadable path
+                        file to write machine-readable grades (default: grades/wolverine_access.csv)
+
+PHYSICS 151, 251
+WINTER 2025
+Version 5.2
+Liam Daly, Blake Bottesi, Michelle Thran
+Last updated: 4/22/2025
+```
+
+This script has been initially developed by Liam Daly in 2025 and has been
+improved by Blake Bottesi and Michelle Thran. It is included with minimal
+changes into this project.
 
 ## Configuration
 
@@ -341,8 +374,11 @@ I don't have the money for that...
 
 - document canvas functions in the source code
 - include screenshots of the Windows Task Scheduler
-- improve the "introduction" command
+- improve the `introduction` command
   - create sign-in sheets if necessary
   - allow configuration of file paths
   - add more options
-- improve the "quiz_code" command
+- improve the `quiz_code` command
+- revise the `final_grades` command
+  - download gradebook through API
+  - check if Wolverine Access is accessible via an API as well

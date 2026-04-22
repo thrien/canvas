@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """Utilities for using Canvas as a GSI
 
-It is intented to be used by GSIs for PHYSICS 151/251 at the University of
-Michigan.
+This script is intended to be used by GSIs for PHYSICS 151/251 at the
+University of Michigan.
 """
 # standard library
 import os
@@ -11,7 +11,7 @@ import argparse
 import inspect
 from urllib.parse import quote, unquote_plus
 from urllib.request import Request, urlopen
-from urllib.error import HTTPError
+#from urllib.error import HTTPError
 import json
 from random import randrange
 # external dependencies
@@ -645,8 +645,8 @@ def final_grades(gradebook, readable="grades/human-readable.csv",
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Utilities for using Canvas "
-                                                 "as a GSI",
+    description, epilog = __doc__.split("\n\n", maxsplit=1)
+    parser = argparse.ArgumentParser(description=description, epilog=epilog,
                                      formatter_class=
                                      ArgumentChoicesHelpFormatter)
 
