@@ -700,16 +700,11 @@ def final_grades(gradebook, grade_key="Current Score",
     if verbose:
         print(f'Human-readable final grades written to "{readable}" as CSV.')
 
-    # Use this csv to cross-reference against canvas to ensure
-    # accuracy of letter grades
     uploadable_grades = _uploadable(df)
     uploadable_grades.to_csv(uploadable,
                              index=False, header=None, float_format=int)
     if verbose:
         print(f'Machine-readable file written to "{uploadable}" as CSV.')
-
-    # Use this csv to upload letter grades to wolverine access.
-    # Not intended for direct reading
 
 
 if __name__ == "__main__":

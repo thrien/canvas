@@ -3,28 +3,32 @@
 This script currently contains six commands.
 
 ```
-$ python canvas.py -h             
-usage: canvas.py [-h] [-v] [-c name]
-                 {sheets,introduction,intro,slides,quiz_code,quiz,new_quiz_code,new_code,worksheet} ...
+$ python canvas.py -h
+usage: canvas.py [-h] [-v] [-c name] command ...
 
 Utilities for using Canvas as a GSI
 
-options:
-  -h, --help            show this help message and exit
-  -v, --verbose         print status messages
-  -c, --course name     the Canvas course (choices: PHYS 151 WN25, PHYS 251 WN26,
-                        PHYS 251 WN26 GSI)
-
-commands:
-  {sheets,introduction,intro,slides,quiz_code,quiz,new_quiz_code,new_code,worksheet}
-    sheets              Draw a sign-in sheet showing what group/table students are
-                        assigned to.
+positional arguments:
+  command
+    sheets              Draw a sign-in sheet showing what group/table students
+                        are assigned to.
     introduction (intro, slides)
                         Create a template for introduction slides
     quiz_code (quiz)    Update the quiz code on the introduction slides
     new_quiz_code (new_code)
                         Generate a new quiz code on Canvas
     worksheet           Download the worksheet for the given lab from Canvas
+    final_grades (grades)
+                        FINAL LETTER GRADE CALCULATOR
+
+options:
+  -h, --help            show this help message and exit
+  -v, --verbose         print status messages (default: 0)
+  -c, --course name     the Canvas course (default: PHYS 251 WN26) (choices:
+                        PHYS 151 WN25, PHYS 251 WN26, PHYS 251 WN26 GSI)
+
+This script is intended to be used by GSIs for PHYSICS 151/251 at the
+University of Michigan.
 ```
 
 Each of them are described below.
@@ -36,14 +40,15 @@ are assigned to.
 
 ```
 $ python canvas.py sheets -h
-usage: canvas.py sheets [-h] [-f] [-e ext [ext ...]] [-l numbers [numbers ...]]
-                        [-s section [section ...]]
+usage: canvas.py sheets [-h] [-f | --force | --no-force] [-e ext [ext ...]]
+                        [-l numbers [numbers ...]] [-s section [section ...]]
 
 Draw a sign-in sheet showing what group/table students are assigned to.
 
 options:
   -h, --help            show this help message and exit
-  -f, --force           pull recent CSV from Canvas (default: False)
+  -f, --force, --no-force
+                        pull recent CSV from Canvas (default: False)
   -e, --extensions ext [ext ...]
                         output formats (default: ['pdf', 'png'])
   -l, --labs numbers [numbers ...]
@@ -53,11 +58,11 @@ options:
 
 Input and output files are organized in the current directory like this:
     .
-    â”œâ”€â”€ canvas.py
-    â””â”€â”€ lab01
-        â”œâ”€â”€ canvas.csv
-        â”œâ”€â”€ groups015.png
-        â””â”€â”€ groups025.png
+    ├── canvas.py
+    └── lab01
+        ├── canvas.csv
+        ├── groups015.png
+        └── groups025.png
 ```
 
 ### Example
@@ -80,10 +85,10 @@ Create a template for introduction slides
 options:
   -h, --help            show this help message and exit
   -u, --update, --no-update
-                        update quiz code
-  -l, --lab number      the lab's number
+                        update quiz code (default: False)
+  -l, --lab number      the lab's number (default: 12)
   -s, --sections section [section ...]
-                        your section numbers
+                        your section numbers (default: [15, 25])
 
 The template has three slides:
     - title page with lab and first section number
@@ -103,7 +108,7 @@ The `quiz_code` command pulls the current quiz access for the specified lab
 from Canvas and updates it on the third slide of the introduction.
 
 ```
-$ python canvas.py quiz_code -h   
+$ python canvas.py quiz_code -h
 usage: canvas.py quiz_code [-h] [-l number]
 
 Update the quiz code on the introduction slides
@@ -132,7 +137,7 @@ Generate a new quiz code on Canvas
 
 options:
   -h, --help        show this help message and exit
-  -l, --lab number  the lab's number
+  -l, --lab number  the lab's number (default: 12)
 
 Overwrites the quiz code on Canvas with a random number.
 Intended to be used in class after students finished the quiz.
@@ -152,8 +157,9 @@ Download the worksheet for the given lab from Canvas
 options:
   -h, --help            show this help message and exit
   -l, --labs number [number ...]
-                        the lab's number
-  -p, --path path       the path to the worksheet file on Canvas
+                        the lab's number (default: [13])
+  -p, --path path       the path to the worksheet file on Canvas (default:
+                        Physics 251 GSI Resources/Lab Worksheets)
 
 The worksheets are stored in another Canvas course (at least for PHYS 251
 WN26). Define another Canvas course ID with " GSI" appended to the name and
@@ -168,8 +174,8 @@ gradebook to check the legitimacy of the results and a machine-readable CSV
 file that can be uploaded to Wolverine Access.
 
 ```
-python canvas.py final_grades -h
-usage: canvas.py final_grades [-h] [-r path] [-u path] gradebook
+$ python canvas.py final_grades -h
+usage: canvas.py final_grades [-h] [-r path] [-u path] [-k name] gradebook
 
 FINAL LETTER GRADE CALCULATOR
 
@@ -178,9 +184,13 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  -r, --readable path   file to write human-readable grades (default: grades/human-readable.csv)
+  -r, --readable path   file to write human-readable grades (default:
+                        grades/human-readable.csv)
   -u, --uploadable path
-                        file to write machine-readable grades (default: grades/wolverine_access.csv)
+                        file to write machine-readable grades (default:
+                        grades/wolverine_access.csv)
+  -k, --grade-key name  the column name for final scores in the gradebook CSV
+                        (default: Current Score)
 
 PHYSICS 151, 251
 WINTER 2025
