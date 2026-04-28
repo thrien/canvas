@@ -629,7 +629,7 @@ def _letter_grade(grade):
         return 'E'
 
 
-def _get_grades(df):
+def _get_grades(df, grade_key="Final Score"):
     """FINAL LETTER GRADE CALCULATOR
 
     PHYSICS 151, 251
@@ -638,8 +638,8 @@ def _get_grades(df):
     Liam Daly, Blake Bottesi, Michelle Thran
     Last updated: 4/22/2025
     """
-    df['Letter Grade'] = df['Final Score'].apply(_letter_grade)
-    grades = df[['Student', 'Section', 'Final Score', 'Letter Grade']]
+    df['Letter Grade'] = df[grade_key].apply(_letter_grade)
+    grades = df[['Student', 'Section', grade_key, 'Letter Grade']]
     return grades
 
 
@@ -665,9 +665,14 @@ def _final_grades_parser(parser):
     parser.add_argument("-u", "--uploadable", type=str, metavar="path",
                         #default=<parsed from function signature>,
                         help="file to write machine-readable grades")
+    parser.add_argument("-k", "--grade-key", type=str, metavar="name",
+                        #default=<parsed from function signature>,
+                        help="the column name for final scores "
+                        "in the gradebook CSV")
 
 
-def final_grades(gradebook, readable="grades/human-readable.csv",
+def final_grades(gradebook, grade_key="Current Score",
+                 readable="grades/human-readable.csv",
                  uploadable="grades/wolverine_access.csv"):
     """FINAL LETTER GRADE CALCULATOR
 
@@ -689,7 +694,7 @@ def final_grades(gradebook, readable="grades/human-readable.csv",
     # Sorts the gradebook first by section, then by student last name
     df = df.sort_values(by=['Section', 'Student'])
 
-    final_grades = _get_grades(df)
+    final_grades = _get_grades(df, grade_key=grade_key)
 
     final_grades.to_csv(readable, index=False)
     if verbose:
