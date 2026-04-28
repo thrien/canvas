@@ -53,11 +53,11 @@ options:
 
 Input and output files are organized in the current directory like this:
     .
-    ├── canvas.py
-    └── lab01
-        ├── canvas.csv
-        ├── groups015.png
-        └── groups025.png
+    â”œâ”€â”€ canvas.py
+    â””â”€â”€ lab01
+        â”œâ”€â”€ canvas.csv
+        â”œâ”€â”€ groups015.png
+        â””â”€â”€ groups025.png
 ```
 
 ### Example
@@ -72,16 +72,18 @@ slide contains the quiz code, which can be update automatically later.
 
 ```
 $ python canvas.py introduction -h
-usage: canvas.py introduction [-h] [-u] [-l number] [-s section [section ...]]
+usage: canvas.py introduction [-h] [-u | --update | --no-update] [-l number]
+                              [-s section [section ...]]
 
 Create a template for introduction slides
 
 options:
   -h, --help            show this help message and exit
-  -u, --update          update quiz code (default: False)
-  -l, --lab number      the lab's number (default: 12)
+  -u, --update, --no-update
+                        update quiz code
+  -l, --lab number      the lab's number
   -s, --sections section [section ...]
-                        your section numbers (default: [15, 25])
+                        your section numbers
 
 The template has three slides:
     - title page with lab and first section number
@@ -130,7 +132,7 @@ Generate a new quiz code on Canvas
 
 options:
   -h, --help        show this help message and exit
-  -l, --lab number  the lab's number (default: 12)
+  -l, --lab number  the lab's number
 
 Overwrites the quiz code on Canvas with a random number.
 Intended to be used in class after students finished the quiz.
@@ -150,9 +152,8 @@ Download the worksheet for the given lab from Canvas
 options:
   -h, --help            show this help message and exit
   -l, --labs number [number ...]
-                        the lab's number (default: [13])
-  -p, --path path       the path to the worksheet file on Canvas (default: Physics
-                        251 GSI Resources/Lab Worksheets)
+                        the lab's number
+  -p, --path path       the path to the worksheet file on Canvas
 
 The worksheets are stored in another Canvas course (at least for PHYS 251
 WN26). Define another Canvas course ID with " GSI" appended to the name and
@@ -380,5 +381,7 @@ I don't have the money for that...
   - add more options
 - improve the `quiz_code` command
 - revise the `final_grades` command
+  - filter by section
+    - create output files per section
   - download gradebook through API
   - check if Wolverine Access is accessible via an API as well

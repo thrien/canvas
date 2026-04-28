@@ -24,23 +24,86 @@ import pandas as pd
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
+long_help = False
 
-class ArgumentChoicesHelpFormatter(argparse.HelpFormatter):
-    """Help formatter that shows available choices for arguments."""
 
-    def _get_help_string(self, action):
-        help_text = action.help
-        if action.choices is not None and '%(choices)' not in help_text:
-            choices_str = ', '.join(str(choice) for choice in action.choices)
-            help_text += f' (choices: {choices_str})'
-        return help_text
+class VerboseHelpAction(argparse._HelpAction):
+    """Help action with optional verbose help message
     
+    If this action is invoked with the long --help option it sets a global
+    variable `long_help` to True, which can then be used in the help formatter.
+    If invoked with the short -h option it sets it to False.
+    """
+    def __call__(self, parser, namespace, values, option_string=None):
+        global long_help
+        long_help = True if option_string == "--help" else False
+
+        super().__call__(parser, namespace, values,
+                         option_string=option_string)
+
 
 # configure help message formatting
-class RawDescriptionDefaultsHelpFormatter(
+class CustomHelpFormatter(
         argparse.RawDescriptionHelpFormatter,
         argparse.ArgumentDefaultsHelpFormatter):
-    pass
+    """Help formatter customized to my preferences
+    
+    - shows available choices for arguments
+    - shows default values for arguments
+    - preserves formatting of description and epilog
+    - limits the width of help messages to 79 characters
+    - limits the number of choices in a metavar to 3, ...
+      - unless the global variable `long_help` is True
+    """
+
+    def __init__(self, *args, width=79, max_choices=3, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._width = min(width, self._width)
+        self._max_choices = max_choices
+
+    def _limit_choices(self, choices):
+        if len(choices) > self._max_choices:
+            choices[self._max_choices-1:] = ["..."]
+        return choices
+
+    def _get_default_metavar_for_choices(self, choices):
+        choices = list(choices)
+        if not long_help:
+            choices = self._limit_choices(choices)
+        return "{" + ", ".join(map(str, choices)) + "}"
+
+    def _get_default_metavar_for_positional(self, action):
+        if action.choices is not None:
+            return self._get_default_metavar_for_choices(action.choices)
+        return super()._get_default_metavar_for_positional(action)
+
+    def _get_default_metavar_for_optional(self, action):
+        if action.choices is not None:
+            return self._get_default_metavar_for_choices(action.choices)
+        else:
+            return super()._get_default_metavar_for_optional(action)
+        
+    def _metavar_formatter(self, action, default_metavar):
+        if action.metavar is not None:
+            result = action.metavar
+        else:
+            result = default_metavar
+
+        def format(tuple_size):
+            if isinstance(result, tuple):
+                return result
+            else:
+                return (result, ) * tuple_size
+        return format
+
+    def _get_help_string(self, action):
+        help = super()._get_help_string(action)
+        if action.choices is not None and '%(choices)' not in help:
+            choices = list(action.choices)
+            if not long_help:
+                choices = self._limit_choices(choices)
+            help += f' (choices: {", ".join(map(str, choices))})'
+        return help
 
 # Canvas API
 API_URL = "https://umich.instructure.com/api/v1"
@@ -647,9 +710,10 @@ def final_grades(gradebook, readable="grades/human-readable.csv",
 if __name__ == "__main__":
     description, epilog = __doc__.split("\n\n", maxsplit=1)
     parser = argparse.ArgumentParser(description=description, epilog=epilog,
-                                     formatter_class=
-                                     ArgumentChoicesHelpFormatter)
-
+                                     formatter_class=CustomHelpFormatter,
+                                     add_help=False)
+    parser.add_argument("-h", "--help", action=VerboseHelpAction,
+                        help="show this help message and exit")
     parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="print status messages")
     parser.add_argument("-c", "--course", choices=COURSES.keys(),
@@ -662,16 +726,14 @@ if __name__ == "__main__":
                "quiz_code":     ["quiz"],
                "new_quiz_code": ["new_code"],
                "final_grades":  ["grades"]}
-    subparsers = parser.add_subparsers(dest="command",
-                                       title="commands",
+    subparsers = parser.add_subparsers(dest="command", metavar="command",
                                        required=True)
     for command in commands:
         description, epilog = command.__doc__.split("\n\n", maxsplit=1)
         subparser = subparsers.add_parser(command.__name__,
                                           aliases=aliases.get(command.__name__,
                                                               []),
-                                          formatter_class=
-                                          RawDescriptionDefaultsHelpFormatter,
+                                          formatter_class=CustomHelpFormatter,
                                           description=description,
                                           help=description,
                                           epilog=epilog)
@@ -692,9 +754,9 @@ if __name__ == "__main__":
 
     args = vars(parser.parse_args())
 
-    # Pop global arguments and find the command to execute
+    # Pop global arguments
     verbose = args.pop("verbose")
-
+    # Find the command to execute
     command_name = args.pop("command")
     command = args.pop("func")
     if verbose:
