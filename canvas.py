@@ -14,15 +14,6 @@ from urllib.request import Request, urlopen
 #from urllib.error import HTTPError
 import json
 from random import randrange
-# external dependencies
-# for sign-in sheets
-import numpy as np
-import matplotlib.pyplot as plt
-# for gradebooks
-import pandas as pd
-# for introduction slides
-from pptx import Presentation
-from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 long_help = False
 
@@ -238,6 +229,8 @@ def _draw(names, groups, title="Groups", smallfont=18, bigfont=25,
     Returns:
         the created matplotlib figure
     """
+    import matplotlib.pyplot as plt
+
     # Create a grid of subplots based on table layout
     fig, axes = plt.subplot_mosaic(table_layout, figsize=(11, 8.5))
 
@@ -324,6 +317,9 @@ def sheets(labs, sections,
             ├── groups015.png
             └── groups025.png
     """
+    import numpy as np
+    import matplotlib.pyplot as plt
+
     if verbose:
         print(f"Processing labs [{', '.join(str(lab) for lab in labs)}] and "
               f"sections [{', '.join(str(section) for section in sections)}].")
@@ -389,6 +385,9 @@ def introduction(lab, sections, update=False):
     Since the quiz code changes quite frequently we put a placeholder in the
     template. Use the quiz_code command to update it before class.
     """
+    from pptx import Presentation
+    from pptx.enum.shapes import MSO_SHAPE_TYPE
+
     intros_path = r"C:\\Users\\umthr\\OneDrive - Umich\\Documents\\Teaching" \
                   r"\\WN26 PHYSICS 251\\Introductions"
     template = intros_path + r"\\Template.pptx"
@@ -470,6 +469,8 @@ def quiz_code(lab):
     This commands pulls the latest quiz code from the Canvas API and updates
     the corresponding slide in the introduction.
     """
+    from pptx import Presentation
+
     if verbose:
         print(f"Updating quiz code for lab {lab:d}.")
 
@@ -682,6 +683,8 @@ def final_grades(gradebook, grade_key="Current Score",
     Liam Daly, Blake Bottesi, Michelle Thran
     Last updated: 4/22/2025
     """
+    import pandas as pd
+
     # Deletes empty rows and test student
     df = pd.read_csv(gradebook, skiprows=[1, 2])
     df = df.drop(df.index[-1])

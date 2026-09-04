@@ -282,8 +282,17 @@ $ python canvas.py -v sheets
 
 ### Dependencies
 
-This script uses `python3` and requires `numpy` and `matplotlib`. It has been
-tested on Linux and Windows, and is expected to run on MacOS as well.
+This script uses `python3`. Dependencies are loaded only when the corresponding
+command is run:
+
+- `sheets` requires `numpy` and `matplotlib`.
+- `introduction` requires `python-pptx`, `numpy`, and `matplotlib`.
+- `quiz_code` requires `python-pptx`.
+- `final_grades` requires `pandas`.
+- `new_quiz_code` and `worksheet` use only the Python standard library.
+
+It has been tested on Linux and Windows, and is expected to run on MacOS as
+well.
 
 ## Documentation
 
