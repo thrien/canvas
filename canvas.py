@@ -99,9 +99,12 @@ class CustomHelpFormatter(
 # Canvas API
 API_URL = "https://umich.instructure.com/api/v1"
 TOKEN = os.getenv("CANVAS_API_TOKEN")
+# course IDs are part of the URL when you open a course in Canvas, e.g.,
+# https://umich.instructure.com/courses/734390
 COURSES = {"PHYS 151 WN25": 734390,
            "PHYS 251 WN26": 850281,
            "PHYS 251 WN26 GSI": 826079}
+COURSE_NAMES = list(COURSES)
 
 # Make sure we are in the right directory
 os.chdir(os.path.dirname(__file__))
@@ -320,6 +323,8 @@ def sheets(labs, sections,
     import numpy as np
     import matplotlib.pyplot as plt
 
+    # TODO warn if lab list is empty, which is the default case if no CSV has
+    #      been downloaded and no Canvas API token is defined
     if verbose:
         print(f"Processing labs [{', '.join(str(lab) for lab in labs)}] and "
               f"sections [{', '.join(str(section) for section in sections)}].")
@@ -719,8 +724,11 @@ if __name__ == "__main__":
                         help="show this help message and exit")
     parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="print status messages")
-    parser.add_argument("-c", "--course", choices=COURSES.keys(),
-                        default="PHYS 251 WN26", help="the Canvas course",
+    # TODO avoid if no courses are defined
+    if COURSE_NAMES:
+        pass
+    parser.add_argument("-c", "--course", choices=COURSE_NAMES,
+                        default=COURSE_NAMES[-1], help="the Canvas course",
                         metavar="name")
 
     commands = [sheets, introduction, quiz_code, new_quiz_code, worksheet,
@@ -767,6 +775,7 @@ if __name__ == "__main__":
             print(f'Command "{command_name}" is an alias '
                   f'for "{command.__name__}".')
 
+    # TODO avoid if no courses are defined
     course = args.pop("course")
     if command == worksheet:
         course += " GSI"
