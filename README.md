@@ -4,7 +4,7 @@ This script currently contains six commands.
 
 ```
 $ python canvas.py -h
-usage: canvas.py [-h] [-v] [-c name] command ...
+usage: canvas.py [-h] [-v] command ...
 
 Utilities for using Canvas as a GSI
 
@@ -24,8 +24,6 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   -v, --verbose         print status messages (default: 0)
-  -c, --course name     the Canvas course (default: PHYS 251 WN26 GSI) (choices:
-                        PHYS 151 WN25, PHYS 251 WN26, PHYS 251 WN26 GSI)
 
 This script is intended to be used by GSIs for PHYSICS 151/251 at the
 University of Michigan.
@@ -310,6 +308,15 @@ ID.
 Paste it into your list of course IDs, e.g.,
 ```
 COURSES = {"PHYS 151 WN25": 734390}
+```
+
+Once defined, a new option will show up as something like this
+```
+$ python canvas.py -h
+usage: canvas.py [-h] [-v] [-c name] command ...
+
+  -c, --course name     the Canvas course (default: PHYS 151 WN25) (choices:
+                        PHYS 151 WN25, PHYS 251 WN26)
 ```
 
 ## Documentation

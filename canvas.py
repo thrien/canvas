@@ -98,12 +98,10 @@ class CustomHelpFormatter(
 
 # Canvas API
 API_URL = "https://umich.instructure.com/api/v1"
-TOKEN = os.getenv("CANVAS_API_TOKEN")
+TOKEN = os.getenv("CANVAS_API_TOKEN")  # None if not defined
 # course IDs are part of the URL when you open a course in Canvas, e.g.,
 # https://umich.instructure.com/courses/734390
-COURSES = {"PHYS 151 WN25": 734390,
-           "PHYS 251 WN26": 850281,
-           "PHYS 251 WN26 GSI": 826079}
+COURSES = {}
 COURSE_NAMES = list(COURSES)
 
 # Make sure we are in the right directory
@@ -144,7 +142,9 @@ def _canvas_api(command, full_url=False, method="GET", parameters={},
         the response as a Python object (list for JSON, else string)
     """
     if not TOKEN:
-        raise RuntimeError("No Canvas API access token defined.")
+        raise RuntimeError("No Canvas API access token defined (see Setup).")
+    if not full_url and not COURSE_ID:
+        raise RuntimeError("No Canvas course configured (see Setup).")
 
     # see https://developerdocs.instructure.com/services/canvas/oauth2/file.oauth#using-access-tokens
     url = command if full_url else f"{API_URL}/{command}"
@@ -207,11 +207,11 @@ def _canvas_import_csv(lab):
 
 
 def _format_name(name):
-    """Format "Smith, Emma Marie" as "Emma Smith"
+    """Format "Smith, Emma Marie" as "__ Emma Smith"
     """
     lasts, firsts = name.split(",")
     first = firsts.strip().split(" ")[0]
-    last = lasts.strip()  #.split(" ")[0]
+    last = lasts.strip()#.split(" ")[0]
 
     return f"__ {first:s} {last:s}"
 
@@ -724,12 +724,10 @@ if __name__ == "__main__":
                         help="show this help message and exit")
     parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="print status messages")
-    # TODO avoid if no courses are defined
-    if COURSE_NAMES:
-        pass
-    parser.add_argument("-c", "--course", choices=COURSE_NAMES,
-                        default=COURSE_NAMES[-1], help="the Canvas course",
-                        metavar="name")
+    if COURSES:
+        parser.add_argument("-c", "--course", choices=COURSE_NAMES,
+                            default=COURSE_NAMES[0], help="the Canvas course",
+                            metavar="name")
 
     commands = [sheets, introduction, quiz_code, new_quiz_code, worksheet,
                 final_grades]
@@ -775,12 +773,14 @@ if __name__ == "__main__":
             print(f'Command "{command_name}" is an alias '
                   f'for "{command.__name__}".')
 
-    # TODO avoid if no courses are defined
-    course = args.pop("course")
-    if command == worksheet:
-        course += " GSI"
-    COURSE_ID = COURSES[course]
-    if verbose:
-        print(f'Using course "{course}" with ID {COURSE_ID:d}.')
+    if COURSES:
+        course = args.pop("course")
+        if command == worksheet:
+            course += " GSI"
+        COURSE_ID = COURSES[course]
+        if verbose:
+            print(f'Using course "{course}" with ID {COURSE_ID:d}.')
+    else:
+        COURSE_ID = None
 
     command(**args)
