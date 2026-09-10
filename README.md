@@ -235,8 +235,7 @@ You might want to configure a few things before using this script.
 For example, you probably want to set some default values for convenience.
 Specifically,
 - your section numbers for the `sheets` command (see
-  [`_sheets_parser`](canvas.py#L295) or
-  [here](https://github.com/thrien/canvas/blob/main/canvas.py#L295:~:text=default%3D%5B15%2C%2025%5D))
+  [`_sheets_parser`](canvas.py#L295))
 - the Canvas course (if set up as described [below](#course-id))
 
 ### Table layout
