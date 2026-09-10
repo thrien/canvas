@@ -230,6 +230,15 @@ thresholds and gradebook assumptions before reusing it for another term.
 
 You might want to configure a few things before using this script.
 
+### Default values
+
+For example, you probably want to set some default values for convenience.
+Specifically,
+- your section numbers for the `sheets` command (see
+  [`_sheets_parser`](canvas.py#L295) or
+  [here](canvas.py#:~:text=default%3D%5B15%2C%2025%5D))
+- the Canvas course (if set up as described [below](#course-id))
+
 ### Table layout
 
 The table layout for the sign-in sheets is defined like this:
@@ -317,6 +326,13 @@ usage: canvas.py [-h] [-v] [-c name] command ...
 
   -c, --course name     the Canvas course (default: PHYS 151 WN25) (choices:
                         PHYS 151 WN25, PHYS 251 WN26)
+```
+You can change the default value here:
+```
+    if COURSES:
+        parser.add_argument("-c", "--course", choices=COURSE_NAMES,
+                            default="PHYS 151 WN25", help="the Canvas course",
+                            metavar="name")
 ```
 
 ## Documentation
