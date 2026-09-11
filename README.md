@@ -78,10 +78,13 @@ There are two ways of using this command.
 For example, for Lab 1 navigate to **People > Groups > Lab 1** and
 select **Download Group Category Roster CSV** under the three dots at the top.
 
-Save the file as `./lab01/canvas.csv` and simply run
+Save the file as `./lab01/canvas.csv` and run
 ```
-$ python canvas.py -v sheets
+$ python canvas.py -v sheets -s 37 42
 ```
+if your section numbers are 37 and 42 for example (read the [section on
+configuration](#default-values) below for instructions on how to save these as
+defaults.)
 
 #### Automatic download
 
@@ -253,7 +256,7 @@ be used to define a cell for the instructor (you) if the variable `instructor`
 holds a name, e.g., `"Thrien, Tobias"`.
 
 The table layout is fed into
-[plt.subplot_mosaic](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.subplot_mosaic.html#matplotlib.pyplot.subplot_mosaic).
+[plt.subplot_mosaic](https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.subplot_mosaic.html).
 Read the documentation for more details.
 
 ## Setup
